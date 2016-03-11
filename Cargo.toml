@@ -5,3 +5,6 @@ authors = ["Sean Purcell <me@seanp.xyz>"]
 
 [dependencies]
 glium = "0.13.5"
+image = "0.7.0"
+time = "0.1.34"
+

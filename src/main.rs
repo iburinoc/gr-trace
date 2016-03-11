@@ -11,7 +11,7 @@ fn main() {
 		.unwrap();
 
 	loop {
-		for ev in display.poll_events() {
+		for ev in display.wait_events() {
 			match ev {
 				glium::glutin::Event::Closed => return,
 				_ => ()
@@ -19,3 +19,4 @@ fn main() {
 		}
 	}
 }
+
