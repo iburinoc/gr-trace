@@ -1,9 +1,11 @@
 extern crate glium;
 extern crate clap; 
 extern crate image;
+extern crate cgmath;
 
 use glium::backend::glutin_backend::GlutinFacade;
 use clap::ArgMatches;
+use std::f32;
 
 struct RenderBuffers(glium::VertexBuffer<RayVertex>, glium::IndexBuffer<u8>);
 pub struct Renderer {
@@ -11,6 +13,8 @@ pub struct Renderer {
     background: glium::texture::Texture2d,
 
     buffers: RenderBuffers,
+
+    t: f32,
 }
 
 impl Renderer {
@@ -45,7 +49,7 @@ impl Renderer {
              glium::IndexBuffer::new(display, TrianglesList, &INDICES).unwrap())
         };
 
-        Renderer { program: prog, background: bg, buffers: bufs }
+        Renderer { program: prog, background: bg, buffers: bufs, t: 0.0 }
     }
 
     pub fn render(&self, display: &GlutinFacade) {
@@ -55,8 +59,27 @@ impl Renderer {
 
         target.clear_color(0., 0., 0., 1.0);
 
+        let (width, height) = target.get_dimensions();
+
+        let facing_mat = {
+            use cgmath::*;
+            let src = Point3::new(0.0f32,0.,0.);
+            let tow = Point3::new(self.t.sin(), 0.0f32, self.t.cos());
+            let up = vec3(0.,1.,0.0f32);
+
+            Into::<[[f32;4];4]>::into(cgmath::Matrix4::look_at(src, tow, up))
+        };
+
+
+        let uniforms = uniform! {
+            height_ratio: (height as f32) / (width as f32),
+            fov_ratio: (f32::consts::FRAC_PI_2/2.).tan(), // pi/2, 90 deg
+            facing: facing_mat,
+            tex: &self.background,
+        };
+
         target.draw(&self.buffers.0, &self.buffers.1, &self.program,
-                    &glium::uniforms::EmptyUniforms,
+                    &uniforms,
                     &Default::default()).unwrap();
 
         target.finish().unwrap();
@@ -93,9 +116,18 @@ const FLAT_SHADER: ShaderPair = ShaderPair {
 #version 140
 
 in vec2 pos;
+out vec3 dir;
 out vec2 pos_v;
 
+uniform float height_ratio; // height / width
+uniform float fov_ratio; // tan(fov / 2)
+
+uniform mat4 facing;
+
 void main() {
+    float x = pos.x * fov_ratio;
+    float y = pos.y * fov_ratio * height_ratio;
+    dir = normalize(vec3(facing * vec4(x, y, 1.0, 1.0)));
     pos_v = pos;
 
     gl_Position = vec4(pos, 0.0, 1.0);
@@ -106,14 +138,34 @@ void main() {
 
 #version 140
 
+in vec3 dir;
 in vec2 pos_v;
 
 out vec4 color;
 
+uniform sampler2D tex;
+
+#define M_PI 3.1415926535897932384626433832795
+
+float yaw(vec3 v) {
+    if(abs(v.y) >= 0.999) {
+        return 0;
+    }
+    return atan(v.x, v.z);
+}
+
+float pitch(vec3 v) {
+    return asin(v.y);
+}
+
+float as_coord(float ang) {
+    return (ang + M_PI / 2.) / M_PI;
+}
+
 void main() {
-    float red = (pos_v.x + 1) / 2.;
-    float green = (pos_v.y + 1) / 2.;
-    color = vec4(red, green, 0.0, 1.0);
+    vec2 tex_coords = vec2(as_coord(yaw(dir)), as_coord(pitch(dir)));
+
+    color = texture(tex, tex_coords);
 }
 
     "#,

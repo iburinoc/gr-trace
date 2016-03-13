@@ -2,6 +2,7 @@
 extern crate glium;
 extern crate clap;
 extern crate image;
+extern crate cgmath;
 
 use glium::glutin::WindowBuilder;
 use glium::DisplayBuild;
