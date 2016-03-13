@@ -21,15 +21,17 @@ fn main() {
 
     let renderer = render::Renderer::new(&display, &args);
 
-    let f: f32 = 0.0;
+    let mut f: f32 = 0.;//std::f32::consts::PI;
 	loop {
-        renderer.render(&display);
+        f += 0.002;
+        renderer.render(&display, f);
 		for ev in display.poll_events() {
 			match ev {
 				glium::glutin::Event::Closed => return,
 				_ => ()
 			}
 		}
+        std::thread::sleep(std::time::Duration::from_millis(16));
 	}
 }
 

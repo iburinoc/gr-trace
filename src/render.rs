@@ -10,11 +10,9 @@ use std::f32;
 struct RenderBuffers(glium::VertexBuffer<RayVertex>, glium::IndexBuffer<u8>);
 pub struct Renderer {
     program: glium::Program,
-    background: glium::texture::Texture2d,
+    background: glium::texture::SrgbTexture2d,
 
     buffers: RenderBuffers,
-
-    t: f32,
 }
 
 impl Renderer {
@@ -30,7 +28,7 @@ impl Renderer {
             let imdim = im.dimensions();
             let im = glium::texture::RawImage2d::from_raw_rgba_reversed(
                         im.into_raw(), imdim);
-            glium::texture::Texture2d::new(display, im).unwrap()
+            glium::texture::SrgbTexture2d::new(display, im).unwrap()
         };
 
         let prog = {
@@ -49,10 +47,10 @@ impl Renderer {
              glium::IndexBuffer::new(display, TrianglesList, &INDICES).unwrap())
         };
 
-        Renderer { program: prog, background: bg, buffers: bufs, t: 0.0 }
+        Renderer { program: prog, background: bg, buffers: bufs }
     }
 
-    pub fn render(&self, display: &GlutinFacade) {
+    pub fn render(&self, display: &GlutinFacade, t: f32) {
         use glium::Surface;
 
         let mut target = display.draw();
@@ -64,7 +62,7 @@ impl Renderer {
         let facing_mat = {
             use cgmath::*;
             let src = Point3::new(0.0f32,0.,0.);
-            let tow = Point3::new(self.t.sin(), 0.0f32, self.t.cos());
+            let tow = Point3::new(t.sin(), 0.0f32, t.cos());
             let up = vec3(0.,1.,0.0f32);
 
             Into::<[[f32;4];4]>::into(cgmath::Matrix4::look_at(src, tow, up))
@@ -73,9 +71,10 @@ impl Renderer {
 
         let uniforms = uniform! {
             height_ratio: (height as f32) / (width as f32),
-            fov_ratio: (f32::consts::FRAC_PI_2/2.).tan(), // pi/2, 90 deg
+            fov_ratio: (f32::consts::PI * 2. / 3. / 2.).tan(), // pi/2, 90 deg
             facing: facing_mat,
-            tex: &self.background,
+            tex: self.background
+                .sampled().wrap_function(glium::uniforms::SamplerWrapFunction::Clamp),
         };
 
         target.draw(&self.buffers.0, &self.buffers.1, &self.program,
@@ -154,16 +153,30 @@ float yaw(vec3 v) {
     return atan(v.x, v.z);
 }
 
+float yaw_coord(vec3 v) {
+    return (yaw(v) + M_PI) / (2. * M_PI);
+}
+
 float pitch(vec3 v) {
     return asin(v.y);
 }
 
-float as_coord(float ang) {
-    return (ang + M_PI / 2.) / M_PI;
+float pitch_coord(vec3 v) {
+    return (pitch(v) + M_PI / 2.) / M_PI;
 }
 
 void main() {
-    vec2 tex_coords = vec2(as_coord(yaw(dir)), as_coord(pitch(dir)));
+    float yw = yaw(dir);
+    float pc = pitch(dir);
+
+    float cosc = cos(pc) * cos(yw);
+
+    //float x = cos(pc) * sin(pc) / cosc;
+    //float y = sin(yw) / cosc;
+    float x = yaw_coord(dir);
+    float y = (dir.y + 1.0) / 2.0;
+
+    vec2 tex_coords = vec2(x, y);
 
     color = texture(tex, tex_coords);
 }
