@@ -55,7 +55,7 @@ impl Renderer {
 
         let mut target = display.draw();
 
-        target.clear_color(0., 0., 0., 1.0);
+        target.clear_color(0., 0., 0., 0.0);
 
         let (width, height) = target.get_dimensions();
 
@@ -65,8 +65,14 @@ impl Renderer {
             let tow = Point3::new(t.sin(), 0.0f32, t.cos());
             let up = vec3(0.,1.,0.0f32);
 
-            Into::<[[f32;4];4]>::into(cgmath::Matrix4::look_at(src, tow, up))
+            println!("dir: {:?}", (tow - src).normalize());
+
+            // cgmath returns a tranposed look_at matrix for some reason
+            Into::<[[f32;4];4]>::into(cgmath::Matrix4::look_at(src, tow, up)
+                .transpose())
         };
+
+        println!("matrix: {:?}", facing_mat);
 
 
         let uniforms = uniform! {
@@ -126,7 +132,7 @@ uniform mat4 facing;
 void main() {
     float x = pos.x * fov_ratio;
     float y = pos.y * fov_ratio * height_ratio;
-    dir = normalize(vec3(facing * vec4(x, y, 1.0, 1.0)));
+    dir = vec3(facing * vec4(x, y, 1.0, 1.0));
     pos_v = pos;
 
     gl_Position = vec4(pos, 0.0, 1.0);
@@ -147,7 +153,7 @@ uniform sampler2D tex;
 #define M_PI 3.1415926535897932384626433832795
 
 float yaw(vec3 v) {
-    if(abs(v.y) >= 0.999) {
+    if(abs(v.y) >= 0.999999) {
         return 0;
     }
     return atan(v.x, v.z);
@@ -166,15 +172,10 @@ float pitch_coord(vec3 v) {
 }
 
 void main() {
-    float yw = yaw(dir);
-    float pc = pitch(dir);
+    vec3 ndir = normalize(dir);
 
-    float cosc = cos(pc) * cos(yw);
-
-    //float x = cos(pc) * sin(pc) / cosc;
-    //float y = sin(yw) / cosc;
-    float x = yaw_coord(dir);
-    float y = (dir.y + 1.0) / 2.0;
+    float x = yaw_coord(ndir);
+    float y = pitch_coord(ndir);
 
     vec2 tex_coords = vec2(x, y);
 
