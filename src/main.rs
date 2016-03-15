@@ -23,11 +23,12 @@ fn main() {
 
     let mut f: f32 = 0.;//std::f32::consts::PI;
 	loop {
-        f += 0.002;
+        //f += 0.002;
         renderer.render(&display, f);
 		for ev in display.poll_events() {
+            use glium::glutin::Event::*;
 			match ev {
-				glium::glutin::Event::Closed => return,
+				Closed => return,
 				_ => ()
 			}
 		}

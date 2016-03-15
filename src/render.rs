@@ -22,7 +22,7 @@ impl Renderer {
             //FIXME: insert alternate bg images here
 
             let im = image::load(
-                        Cursor::new(&include_bytes!("../resources/bg.jpg")[..]),
+                        Cursor::new(&include_bytes!("../resources/bg-extend.jpg")[..]),
                         image::JPEG).unwrap().to_rgba();
 
             let imdim = im.dimensions();
@@ -65,15 +65,10 @@ impl Renderer {
             let tow = Point3::new(t.sin(), 0.0f32, t.cos());
             let up = vec3(0.,1.,0.0f32);
 
-            println!("dir: {:?}", (tow - src).normalize());
-
             // cgmath returns a tranposed look_at matrix for some reason
             Into::<[[f32;4];4]>::into(cgmath::Matrix4::look_at(src, tow, up)
                 .transpose())
         };
-
-        println!("matrix: {:?}", facing_mat);
-
 
         let uniforms = uniform! {
             height_ratio: (height as f32) / (width as f32),
@@ -152,15 +147,19 @@ uniform sampler2D tex;
 
 #define M_PI 3.1415926535897932384626433832795
 
+float atan2(float y, float x) {
+    return x == 0.0 ? sign(y) * M_PI / 2 : atan(y, x);
+}
+
 float yaw(vec3 v) {
     if(abs(v.y) >= 0.999999) {
         return 0;
     }
-    return atan(v.x, v.z);
+    return atan2(v.x, v.z);
 }
 
 float yaw_coord(vec3 v) {
-    return (yaw(v) + M_PI) / (2. * M_PI);
+    return (yaw(v) + M_PI) / (2. * M_PI) * 0.9975; /* correct for extra border */
 }
 
 float pitch(vec3 v) {
