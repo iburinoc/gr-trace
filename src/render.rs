@@ -22,7 +22,7 @@ impl Renderer {
             //FIXME: insert alternate bg images here
 
             let im = image::load(
-                        Cursor::new(&include_bytes!("../resources/bg-extend.jpg")[..]),
+                        Cursor::new(&include_bytes!("../resources/bg.jpg")[..]),
                         image::JPEG).unwrap().to_rgba();
 
             let imdim = im.dimensions();
@@ -61,8 +61,8 @@ impl Renderer {
 
         let facing_mat = {
             use cgmath::*;
-            let src = Point3::new(0.0f32,0.,0.);
-            let tow = Point3::new(t.sin(), 0.0f32, t.cos());
+            let src = Point3::new(0.0f32,-10.,0.);
+            let tow = Point3::new(t.sin(), 5.0f32, t.cos());
             let up = vec3(0.,1.,0.0f32);
 
             // cgmath returns a tranposed look_at matrix for some reason
@@ -152,14 +152,14 @@ float atan2(float y, float x) {
 }
 
 float yaw(vec3 v) {
-    if(abs(v.y) >= 0.999999) {
-        return 0;
-    }
+    //if(abs(v.y) >= 0.999999) {
+    //    return 0;
+    //}
     return atan2(v.x, v.z);
 }
 
 float yaw_coord(vec3 v) {
-    return (yaw(v) + M_PI) / (2. * M_PI) * 0.9975; /* correct for extra border */
+    return (yaw(v) + M_PI) / (2. * M_PI) * 1.1 - 0.05; /* correct for extra border */
 }
 
 float pitch(vec3 v) {
