@@ -61,8 +61,8 @@ impl Renderer {
 
         let facing_mat = {
             use cgmath::*;
-            let src = Point3::new(0.0f32,-10.,0.);
-            let tow = Point3::new(t.sin(), 5.0f32, t.cos());
+            let src = Point3::new(0.0f32,0.0,0.);
+            let tow = Point3::new(t.sin(), 1.0f32, t.cos());
             let up = vec3(0.,1.,0.0f32);
 
             // cgmath returns a tranposed look_at matrix for some reason
@@ -75,12 +75,20 @@ impl Renderer {
             fov_ratio: (f32::consts::PI * 2. / 3. / 2.).tan(), // pi/2, 90 deg
             facing: facing_mat,
             tex: self.background
-                .sampled().wrap_function(glium::uniforms::SamplerWrapFunction::Clamp),
+                .sampled().wrap_function(glium::uniforms::SamplerWrapFunction::Repeat),
+        };
+
+        let params = glium::DrawParameters {
+            blend: glium::Blend {
+                color: glium::BlendingFunction::AlwaysReplace,
+                alpha: glium::BlendingFunction::AlwaysReplace,
+                constant_value: (0.0, 0.0, 0.0, 0.0),
+            },
+            .. Default::default()
         };
 
         target.draw(&self.buffers.0, &self.buffers.1, &self.program,
-                    &uniforms,
-                    &Default::default()).unwrap();
+                    &uniforms, &params).unwrap();
 
         target.finish().unwrap();
     }
@@ -152,14 +160,11 @@ float atan2(float y, float x) {
 }
 
 float yaw(vec3 v) {
-    //if(abs(v.y) >= 0.999999) {
-    //    return 0;
-    //}
     return atan2(v.x, v.z);
 }
 
 float yaw_coord(vec3 v) {
-    return (yaw(v) + M_PI) / (2. * M_PI) * 1.1 - 0.05; /* correct for extra border */
+    return (yaw(v) + M_PI) / (2. * M_PI);
 }
 
 float pitch(vec3 v) {
@@ -178,13 +183,15 @@ void main() {
 
     vec2 tex_coords = vec2(x, y);
 
-    color = texture(tex, tex_coords);
+    /* force the LOD so that GLSL doesn't flip out on the discontinuity
+       at the texture border */
+    color = textureLod(tex, tex_coords, 0.f);
 }
 
     "#,
 };
 
-const GR_SHADER: ShaderPair = ShaderPair {
+/*const GR_SHADER: ShaderPair = ShaderPair {
     vert_shader: r#"
 
 #version 140
@@ -214,5 +221,5 @@ void main() {
 }
 
     "#,
-};
+};*/
 

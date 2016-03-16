@@ -21,7 +21,7 @@ fn main() {
 
     let renderer = render::Renderer::new(&display, &args);
 
-    let mut f: f32 = 0.;//std::f32::consts::PI;
+    let mut f: f32 = 0.2;//std::f32::consts::PI;
 	loop {
         f += 0.002;
         renderer.render(&display, f);
