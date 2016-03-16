@@ -3,6 +3,7 @@ extern crate glium;
 extern crate clap;
 extern crate image;
 extern crate cgmath;
+extern crate time;
 
 use glium::glutin::WindowBuilder;
 use glium::DisplayBuild;
@@ -32,7 +33,6 @@ fn main() {
 				_ => ()
 			}
 		}
-        std::thread::sleep(std::time::Duration::from_millis(16));
 	}
 }
 

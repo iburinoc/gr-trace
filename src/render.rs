@@ -2,6 +2,7 @@ extern crate glium;
 extern crate clap; 
 extern crate image;
 extern crate cgmath;
+extern crate time;
 
 use glium::backend::glutin_backend::GlutinFacade;
 use clap::ArgMatches;
@@ -52,6 +53,9 @@ impl Renderer {
 
     pub fn render(&self, display: &GlutinFacade, t: f32) {
         use glium::Surface;
+        use time::precise_time_ns;
+
+        let start = precise_time_ns();
 
         let mut target = display.draw();
 
@@ -59,23 +63,33 @@ impl Renderer {
 
         let (width, height) = target.get_dimensions();
 
+        let src = [-10.0 * t.sin(),0.0,-10.0 * t.cos()];
         let facing_mat = {
             use cgmath::*;
-            let src = Point3::new(0.0f32,0.0,0.);
-            let tow = Point3::new(t.sin(), 1.0f32, t.cos());
+            let dir = vec3(t.sin(), 0.0f32, t.cos());
             let up = vec3(0.,1.,0.0f32);
 
             // cgmath returns a tranposed look_at matrix for some reason
-            Into::<[[f32;4];4]>::into(cgmath::Matrix4::look_at(src, tow, up)
+            Into::<[[f32;3];3]>::into(cgmath::Matrix3::look_at(dir, up)
                 .transpose())
+        };
+
+        let (num_iter, time_step) = {
+            let distance = 30.0f32; /* 2 * 15R_s, deflection is minimal by then */
+            let num_iter = 100; /* arbitrary */
+            
+            (num_iter, distance / (num_iter as f32))
         };
 
         let uniforms = uniform! {
             height_ratio: (height as f32) / (width as f32),
             fov_ratio: (f32::consts::PI * 2. / 3. / 2.).tan(), // pi/2, 90 deg
+            src: src,
             facing: facing_mat,
             tex: self.background
                 .sampled().wrap_function(glium::uniforms::SamplerWrapFunction::Repeat),
+            NUM_ITER: num_iter,
+            TIME_STEP: time_step,
         };
 
         let params = glium::DrawParameters {
@@ -91,6 +105,9 @@ impl Renderer {
                     &uniforms, &params).unwrap();
 
         target.finish().unwrap();
+
+        let end = precise_time_ns();
+        println!("dt: {}ms", (end - start) as f32 / (1000000.0f32));
     }
 }
 
@@ -130,12 +147,12 @@ out vec2 pos_v;
 uniform float height_ratio; // height / width
 uniform float fov_ratio; // tan(fov / 2)
 
-uniform mat4 facing;
+uniform mat3 facing;
 
 void main() {
     float x = pos.x * fov_ratio;
     float y = pos.y * fov_ratio * height_ratio;
-    dir = vec3(facing * vec4(x, y, 1.0, 1.0));
+    dir = facing * vec3(x, y, 1.0);
     pos_v = pos;
 
     gl_Position = vec4(pos, 0.0, 1.0);
@@ -146,14 +163,23 @@ void main() {
 
 #version 140
 
+#define M_PI 3.1415926535897932384626433832795
+
 in vec3 dir;
-in vec2 pos_v;
 
 out vec4 color;
 
-uniform sampler2D tex;
+uniform sampler2D bgtex;
+uniform int NUM_ITER;
+uniform float TIME_STEP;
 
-#define M_PI 3.1415926535897932384626433832795
+/* we set constants to convenient values for now */
+const float C = 1.0;
+const float R_s = 1.0;
+const float M = 0.5; /* must be R_s / 2 */
+const float G = 1.0;
+
+uniform vec3 src;
 
 float atan2(float y, float x) {
     return x == 0.0 ? sign(y) * M_PI / 2 : atan(y, x);
@@ -175,17 +201,51 @@ float pitch_coord(vec3 v) {
     return (pitch(v) + M_PI / 2.) / M_PI;
 }
 
-void main() {
-    vec3 ndir = normalize(dir);
-
-    float x = yaw_coord(ndir);
-    float y = pitch_coord(ndir);
+vec4 bg_tex(vec3 dir) {
+    float x = yaw_coord(dir);
+    float y = pitch_coord(dir);
 
     vec2 tex_coords = vec2(x, y);
 
+    bool border = x < 0.001 || x > 0.999;
+    vec2 dx = border ? vec2(0,0) : dFdx(tex_coords);
+
     /* force the LOD so that GLSL doesn't flip out on the discontinuity
        at the texture border */
-    color = textureLod(tex, tex_coords, 0.f);
+    return textureGrad(bgtex, tex_coords, dx, dFdy(tex_coords));
+}
+
+const vec4 ZERO = vec4(0.0, 0.0, 0.0, 0.0);
+
+void main() {
+    vec3 ndir = normalize(dir);
+
+    vec3 cdir = ndir; /* current direction */
+    vec3 pos = src;
+
+    float alpha_rem = 1.0;
+    vec4 ccolor = vec4(0.0, 0.0, 0.0, 0.0);
+
+    for(int i = 0; i < NUM_ITER; i++) {
+        vec3 npos = pos + cdir * C * TIME_STEP;
+
+        {
+            int inBH = int(dot(npos, npos) <= (R_s * R_s));
+            ccolor += mix(ZERO, alpha_rem * vec4(0.0, 0.0, 0.0, 1.0), inBH);
+            alpha_rem *= mix(1.0, 0.0, inBH);
+        }
+        /* check if its within a black hole */
+        //if(length(npos) <= R_s) {
+        //    ccolor += alpha_rem * vec4(0.0, 0.0, 0.0, 1.0);
+        //    alpha_rem *= 0.0;
+        //}
+
+        pos = npos;
+    }
+
+    ccolor += alpha_rem * bg_tex(cdir);
+
+    color = ccolor;
 }
 
     "#,
