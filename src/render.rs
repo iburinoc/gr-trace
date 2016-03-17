@@ -76,7 +76,7 @@ impl Renderer {
 
         let (num_iter, time_step) = {
             let distance = 30.0f32; /* 2 * 15R_s, deflection is minimal by then */
-            let num_iter = 1000; /* arbitrary */
+            let num_iter = 10000; /* arbitrary */
             
             (num_iter, distance / (num_iter as f32))
         };
@@ -238,16 +238,11 @@ void main() {
         for(int i = 0; i < NUM_ITER; i++) {
             vec3 npos = pos + cdir * C * TIME_STEP;
 
-            {
-                int inBH = int(dot(npos, npos) <= (R_s * R_s));
-                ccolor += mix(ZERO, alpha_rem * vec4(0.0, 0.0, 0.0, 1.0), inBH);
-                alpha_rem *= mix(1.0, 0.0, inBH);
-            }
             /* check if its within a black hole */
-            //if(length(npos) <= R_s) {
-            //    ccolor += alpha_rem * vec4(0.0, 0.0, 0.0, 1.0);
-            //    alpha_rem *= 0.0;
-            //}
+            if(length(npos) <= R_s) {
+                ccolor += alpha_rem * vec4(0.0, 0.0, 0.0, 1.0);
+                alpha_rem *= 0.0;
+            }
 
             pos = npos;
         }
