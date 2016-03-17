@@ -76,7 +76,7 @@ impl Renderer {
 
         let (num_iter, time_step) = {
             let distance = 30.0f32; /* 2 * 15R_s, deflection is minimal by then */
-            let num_iter = 100; /* arbitrary */
+            let num_iter = 1000; /* arbitrary */
             
             (num_iter, distance / (num_iter as f32))
         };
@@ -207,8 +207,13 @@ vec4 bg_tex(vec3 dir) {
 
     vec2 tex_coords = vec2(x, y);
 
-    bool border = x < 0.001 || x > 0.999;
-    vec2 dx = border ? vec2(0,0) : dFdx(tex_coords);
+    float invert_x = x - 0.5;
+    invert_x = invert_x - sign(invert_x) * 0.5;
+
+    vec2 dx1 = dFdx(tex_coords);
+    vec2 dx2 = dFdx(vec2(invert_x, y));
+
+    vec2 dx = dot(dx1, dx1) < dot(dx2, dx2) ? dx1 : dx2;
 
     /* force the LOD so that GLSL doesn't flip out on the discontinuity
        at the texture border */
@@ -220,27 +225,32 @@ const vec4 ZERO = vec4(0.0, 0.0, 0.0, 0.0);
 void main() {
     vec3 ndir = normalize(dir);
 
-    vec3 cdir = ndir; /* current direction */
-    vec3 pos = src;
+    /* closest approach to BH */
+    float dist = length(cross(ndir, src));
 
     float alpha_rem = 1.0;
     vec4 ccolor = vec4(0.0, 0.0, 0.0, 0.0);
+    vec3 cdir = ndir; /* current direction */
+    if(dist < 3) {
+        vec3 pos = src;
 
-    for(int i = 0; i < NUM_ITER; i++) {
-        vec3 npos = pos + cdir * C * TIME_STEP;
 
-        {
-            int inBH = int(dot(npos, npos) <= (R_s * R_s));
-            ccolor += mix(ZERO, alpha_rem * vec4(0.0, 0.0, 0.0, 1.0), inBH);
-            alpha_rem *= mix(1.0, 0.0, inBH);
+        for(int i = 0; i < NUM_ITER; i++) {
+            vec3 npos = pos + cdir * C * TIME_STEP;
+
+            {
+                int inBH = int(dot(npos, npos) <= (R_s * R_s));
+                ccolor += mix(ZERO, alpha_rem * vec4(0.0, 0.0, 0.0, 1.0), inBH);
+                alpha_rem *= mix(1.0, 0.0, inBH);
+            }
+            /* check if its within a black hole */
+            //if(length(npos) <= R_s) {
+            //    ccolor += alpha_rem * vec4(0.0, 0.0, 0.0, 1.0);
+            //    alpha_rem *= 0.0;
+            //}
+
+            pos = npos;
         }
-        /* check if its within a black hole */
-        //if(length(npos) <= R_s) {
-        //    ccolor += alpha_rem * vec4(0.0, 0.0, 0.0, 1.0);
-        //    alpha_rem *= 0.0;
-        //}
-
-        pos = npos;
     }
 
     ccolor += alpha_rem * bg_tex(cdir);
