@@ -8,12 +8,19 @@ use glium::backend::glutin_backend::GlutinFacade;
 use clap::ArgMatches;
 use std::f32;
 
+struct RenderParams {
+    flat: bool,
+    iter: i32,
+}
+
 struct RenderBuffers(glium::VertexBuffer<RayVertex>, glium::IndexBuffer<u8>);
 pub struct Renderer {
     program: glium::Program,
     background: glium::texture::SrgbTexture2d,
 
     buffers: RenderBuffers,
+
+    params: RenderParams,
 }
 
 impl Renderer {
@@ -48,7 +55,8 @@ impl Renderer {
              glium::IndexBuffer::new(display, TrianglesList, &INDICES).unwrap())
         };
 
-        Renderer { program: prog, background: bg, buffers: bufs }
+        Renderer { program: prog, background: bg, buffers: bufs,
+            params: RenderParams::new(args) }
     }
 
     pub fn render(&self, display: &GlutinFacade, t: f32) {
@@ -76,7 +84,7 @@ impl Renderer {
 
         let (num_iter, time_step) = {
             let distance = 30.0f32; /* 2 * 15R_s, deflection is minimal by then */
-            let num_iter = 10000; /* arbitrary */
+            let num_iter = self.params.iter; /* arbitrary */
             
             (num_iter, distance / (num_iter as f32))
         };
@@ -90,6 +98,7 @@ impl Renderer {
                 .sampled().wrap_function(glium::uniforms::SamplerWrapFunction::Repeat),
             NUM_ITER: num_iter,
             TIME_STEP: time_step,
+            FLAT: self.params.flat,
         };
 
         let params = glium::DrawParameters {
@@ -108,6 +117,15 @@ impl Renderer {
 
         let end = precise_time_ns();
         println!("dt: {}ms", (end - start) as f32 / (1000000.0f32));
+    }
+}
+
+impl RenderParams {
+    fn new(args: &ArgMatches) -> Self {
+        RenderParams {
+            flat: args.is_present("flat"),
+            iter: args.value_of("iter").unwrap().parse::<i32>().unwrap(),
+        }
     }
 }
 
@@ -179,6 +197,8 @@ const float R_s = 1.0;
 const float M = 0.5; /* must be R_s / 2 */
 const float G = 1.0;
 
+uniform bool FLAT;
+
 uniform vec3 src;
 
 float atan2(float y, float x) {
@@ -231,22 +251,35 @@ void main() {
     float alpha_rem = 1.0;
     vec4 ccolor = vec4(0.0, 0.0, 0.0, 0.0);
     vec3 cdir = ndir; /* current direction */
-    if(dist < 3) {
+    //if(dist < 3) {
         vec3 pos = src;
+        vec3 h = cross(pos, cdir);
+        float h2 = dot(h, h); /* angular momentum */
 
 
         for(int i = 0; i < NUM_ITER; i++) {
-            vec3 npos = pos + cdir * C * TIME_STEP;
+            vec3 npos = pos + cdir * TIME_STEP;
+            if(!FLAT) {
+                vec3 accel = -pos * 1.5 * h2 * pow(dot(pos, pos), -2.5);
+                cdir = cdir + accel * TIME_STEP;
+                if(0 == i % 100) {
+                    cdir = normalize(cdir);
+                    h = cross(pos, cdir);
+                    h2 = dot(h, h);
+                }
+                //cdir = cdir + accel * TIME_STEP;
+            }
 
             /* check if its within a black hole */
             if(length(npos) <= R_s) {
-                ccolor += alpha_rem * vec4(0.0, 0.0, 0.0, 1.0);
+                ccolor += alpha_rem * vec4(0.0, 0.0, 1.0, 1.0);
                 alpha_rem *= 0.0;
             }
 
             pos = npos;
         }
-    }
+    //}
+    cdir = normalize(cdir);
 
     ccolor += alpha_rem * bg_tex(cdir);
 
