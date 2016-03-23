@@ -71,7 +71,7 @@ impl Renderer {
 
         let (width, height) = target.get_dimensions();
 
-        let src = [-10.0 * t.sin(),0.0,-10.0 * t.cos()];
+        let src = [-3.0 * t.sin(),0.0,-3.0 * t.cos()];
         let facing_mat = {
             use cgmath::*;
             let dir = vec3(t.sin(), 0.0f32, t.cos());
@@ -83,7 +83,7 @@ impl Renderer {
         };
 
         let (num_iter, time_step) = {
-            let distance = 30.0f32; /* 2 * 15R_s, deflection is minimal by then */
+            let distance = 15.0f32; /* 2 * 15R_s, deflection is minimal by then */
             let num_iter = self.params.iter; /* arbitrary */
             
             (num_iter, distance / (num_iter as f32))
@@ -156,7 +156,7 @@ struct ShaderPair {
 const FLAT_SHADER: ShaderPair = ShaderPair {
     vert_shader: r#"
 
-#version 140
+#version 330
 
 in vec2 pos;
 out vec3 dir;
@@ -179,7 +179,7 @@ void main() {
     "#,
     frag_shader: r#"
 
-#version 140
+#version 330
 
 #define M_PI 3.1415926535897932384626433832795
 
@@ -248,37 +248,38 @@ void main() {
     /* closest approach to BH */
     float dist = length(cross(ndir, src));
 
+    /* test iteration function */
+    int num_iter = int((1 / (1 + dist * 0.2)) * NUM_ITER);
+
     float alpha_rem = 1.0;
     vec4 ccolor = vec4(0.0, 0.0, 0.0, 0.0);
     vec3 cdir = ndir; /* current direction */
-    //if(dist < 3) {
-        vec3 pos = src;
-        vec3 h = cross(pos, cdir);
-        float h2 = dot(h, h); /* angular momentum */
 
+    vec3 pos = src;
+    vec3 h = cross(pos, cdir);
+    float h2 = dot(h, h); /* angular momentum */
 
-        for(int i = 0; i < NUM_ITER; i++) {
-            vec3 npos = pos + cdir * TIME_STEP;
-            if(!FLAT) {
-                vec3 accel = -pos * 1.5 * h2 * pow(dot(pos, pos), -2.5);
-                cdir = cdir + accel * TIME_STEP;
-                if(0 == i % 100) {
-                    cdir = normalize(cdir);
-                    h = cross(pos, cdir);
-                    h2 = dot(h, h);
-                }
-                //cdir = cdir + accel * TIME_STEP;
+    for(int i = 0; i < num_iter; i++) {
+        vec3 npos = pos + cdir * TIME_STEP;
+        if(!FLAT) {
+            vec3 accel = -pos * 1.5 * h2 * pow(dot(pos, pos), -2.5);
+            cdir = cdir + accel * TIME_STEP;
+            if(0 == i % 100) {
+                cdir = normalize(cdir);
+                h = cross(pos, cdir);
+                h2 = dot(h, h);
             }
-
-            /* check if its within a black hole */
-            if(length(npos) <= R_s) {
-                ccolor += alpha_rem * vec4(0.0, 0.0, 1.0, 1.0);
-                alpha_rem *= 0.0;
-            }
-
-            pos = npos;
+            //cdir = cdir + accel * TIME_STEP;
         }
-    //}
+
+        /* check if its within a black hole */
+        if(length(npos) <= R_s) {
+            ccolor += alpha_rem * vec4(0.0, 0.0, 1.0, 1.0);
+            alpha_rem *= 0.0;
+        }
+
+        pos = npos;
+    }
     cdir = normalize(cdir);
 
     ccolor += alpha_rem * bg_tex(cdir);
