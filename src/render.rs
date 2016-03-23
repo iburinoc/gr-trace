@@ -229,15 +229,20 @@ vec4 bg_tex(vec3 dir) {
 
     float invert_x = x - 0.5;
     invert_x = invert_x - sign(invert_x) * 0.5;
+    vec2 invert_coords = vec2(invert_x, y);
 
     vec2 dx1 = dFdx(tex_coords);
-    vec2 dx2 = dFdx(vec2(invert_x, y));
+    vec2 dx2 = dFdx(invert_coords);
+
+    vec2 dy1 = dFdy(tex_coords);
+    vec2 dy2 = dFdy(invert_coords);
 
     vec2 dx = dot(dx1, dx1) < dot(dx2, dx2) ? dx1 : dx2;
+    vec2 dy = dot(dy1, dy1) < dot(dy2, dy2) ? dy1 : dy2;
 
     /* force the LOD so that GLSL doesn't flip out on the discontinuity
        at the texture border */
-    return textureGrad(bgtex, tex_coords, dx, dFdy(tex_coords));
+    return textureGrad(bgtex, tex_coords, dx, dy);
 }
 
 const vec4 ZERO = vec4(0.0, 0.0, 0.0, 0.0);
