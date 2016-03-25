@@ -71,7 +71,7 @@ impl Renderer {
 
         let (width, height) = target.get_dimensions();
 
-        let src = [-3.0 * t.sin(),0.0,-3.0 * t.cos()];
+        let src = [-10.0 * t.sin(),0.0,-10.0 * t.cos()];
         let facing_mat = {
             use cgmath::*;
             let dir = vec3(t.sin(), 0.0f32, t.cos());
@@ -246,8 +246,14 @@ vec4 bg_tex(vec3 dir) {
 }
 
 const vec4 ZERO = vec4(0.0, 0.0, 0.0, 0.0);
+const float TDIST = 20.0;
+const float BTHRESHOLD = 0.9;
+const float TTHRESHOLD = 0.95;
+const float M_RAT = 8;
 
 void main() {
+    float cdist = 0.0;
+    float ratio = 1.0;
     vec3 ndir = normalize(dir);
 
     /* closest approach to BH */
@@ -264,27 +270,51 @@ void main() {
     vec3 h = cross(pos, cdir);
     float h2 = dot(h, h); /* angular momentum */
 
-    for(int i = 0; i < num_iter; i++) {
-        vec3 npos = pos + cdir * TIME_STEP;
+    while(cdist < TDIST) {
+        vec3 npos = pos + cdir * TIME_STEP * ratio;
+        cdist += TIME_STEP * ratio;
         if(!FLAT) {
             vec3 accel = -pos * 1.5 * h2 * pow(dot(pos, pos), -2.5);
-            cdir = cdir + accel * TIME_STEP;
-            if(0 == i % 100) {
-                cdir = normalize(cdir);
-                h = cross(pos, cdir);
-                h2 = dot(h, h);
+            vec3 ncdir = cdir + accel * TIME_STEP * ratio;
+            ncdir = normalize(ncdir);
+            h = cross(pos, ncdir);
+            h2 = dot(h, h);
+            if(dot(ncdir, cdir) < BTHRESHOLD && ratio > (1/M_RAT)) {
+                ratio *= 0.5;
+            } else if(dot(ncdir, cdir) > TTHRESHOLD && ratio < M_RAT) {
+                ratio *= 2;
             }
-            //cdir = cdir + accel * TIME_STEP;
+            cdir = ncdir;
         }
 
         /* check if its within a black hole */
         if(length(npos) <= R_s) {
-            ccolor += alpha_rem * vec4(0.0, 0.0, 1.0, 1.0);
+            ccolor += alpha_rem * vec4(0.0, 0.0, 0.0, 1.0);
             alpha_rem *= 0.0;
         }
 
         pos = npos;
     }
+/*
+    for(int i = 0; i < num_iter; i++) {
+        vec3 npos = pos + cdir * TIME_STEP;
+        if(!FLAT) {
+            vec3 accel = -pos * 1.5 * h2 * pow(dot(pos, pos), -2.5);
+            cdir = cdir + accel * TIME_STEP;
+            cdir = normalize(cdir);
+            h = cross(pos, cdir);
+            h2 = dot(h, h);
+            //cdir = cdir + accel * TIME_STEP;
+        }
+
+        /* check if its within a black hole */
+  /*      if(length(npos) <= R_s) {
+            ccolor += alpha_rem * vec4(0.0, 0.0, 1.0, 1.0);
+            alpha_rem *= 0.0;
+        }
+
+        pos = npos;
+    }*/
     cdir = normalize(cdir);
 
     ccolor += alpha_rem * bg_tex(cdir);
