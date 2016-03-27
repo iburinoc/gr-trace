@@ -15,6 +15,7 @@ use clap::{Arg, App, ArgMatches};
 
 mod settings;
 mod render;
+mod shaders;
 
 fn main() {
     let args = arg_handle();
@@ -25,7 +26,7 @@ fn main() {
     let mut f: f32 = 0.2;//std::f32::consts::PI;
 	loop {
         f += 0.002;
-        renderer.render(&display, f);
+        renderer.render(display.draw(), f);
 		for ev in display.poll_events() {
             use glium::glutin::Event::*;
 			match ev {
