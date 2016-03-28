@@ -33,9 +33,13 @@ impl Renderer {
             use std::io::Cursor;
             //FIXME: insert alternate bg images here
 
-            let im = image::load(
-                        Cursor::new(&include_bytes!("../resources/bg.jpg")[..]),
-                        image::JPEG).unwrap().to_rgba();
+            let bytes = if cfg!(debug_assertions) {
+                &include_bytes!("../resources/bg-small.jpg")[..]
+            } else {
+                &include_bytes!("../resources/bg.jpg")[..]
+            };
+            let im = image::load(Cursor::new(bytes),
+                                 image::JPEG).unwrap().to_rgba();
 
             let imdim = im.dimensions();
             let im = glium::texture::RawImage2d::from_raw_rgba_reversed(

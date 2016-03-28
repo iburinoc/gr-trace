@@ -3,9 +3,6 @@ name = "gr_trace"
 version = "0.1.0"
 authors = ["Sean Purcell <me@seanp.xyz>"]
 
-[profile.dev]
-opt-level = 2
-
 [dependencies]
 glium = "0.13.5"
 image = "0.7.0"

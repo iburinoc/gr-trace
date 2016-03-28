@@ -58,7 +58,7 @@ fn arg_handle<'a>() -> ArgMatches<'a> {
         .arg(Arg::with_name("flat")
             .short("f")
             .long("flat")
-            .help("Turns of relativistic distortion"))
+            .help("Turns off relativistic distortion"))
         .arg(Arg::with_name("iter")
             .short("i")
             .long("iter")
