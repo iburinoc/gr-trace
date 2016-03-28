@@ -1,5 +1,5 @@
 [package]
-name = "gr-trace"
+name = "gr_trace"
 version = "0.1.0"
 authors = ["Sean Purcell <me@seanp.xyz>"]
 
