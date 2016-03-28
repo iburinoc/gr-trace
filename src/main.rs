@@ -13,9 +13,15 @@ use std::path::Path;
 
 use clap::{Arg, App, ArgMatches};
 
-mod settings;
 mod render;
 mod shaders;
+
+
+#[allow(dead_code)]
+mod settings {
+    pub const NAME: &'static str = "gr-trace";
+    pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+}
 
 fn main() {
     let args = arg_handle();
