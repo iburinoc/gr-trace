@@ -73,6 +73,14 @@ fn arg_handle<'a>() -> ArgMatches<'a> {
             .value_name("FILE")
             .takes_value(true)
             .default_value("out.png"))
+        .arg(Arg::with_name("bg")
+            .short("b")
+            .long("bg")
+            .help("Sets the type of background used")
+            .takes_value(true)
+            .value_name("TYPE")
+                .possible_value("black")
+                .possible_value("img"))
         .get_matches()
 }
 

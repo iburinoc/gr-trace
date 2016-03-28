@@ -53,7 +53,7 @@ uniform mat3 facing;
 void main() {
     float x = pos.x * fov_ratio;
     float y = pos.y * fov_ratio * height_ratio;
-    dir = facing * vec3(x, y, 1.0);
+    dir_v = facing * vec3(x, y, 1.0);
     pos_v = pos;
 
     gl_Position = vec4(pos, 0.0, 1.0);
@@ -61,12 +61,16 @@ void main() {
 
 "#;
 
+#[allow(unused_variables)]
 mod frag_shader {
+    use clap::ArgMatches;
     pub fn gen_shader(args: &ArgMatches) -> String {
         format!(r#"
 {preamble}
 
 {bg_func}
+
+{params}
 
 void main() {{
     float alpha_rem = 1.0;
@@ -75,7 +79,7 @@ void main() {{
     vec3 pos = src;
 
     /* closest approach to BH */
-    float min_dist = length(cross(ndir, src));
+    float min_dist = length(cross(dir, src));
 
     {loop_vars}
 
@@ -100,9 +104,10 @@ void main() {{
         
         preamble = PREAMBLE,
         bg_func = bg::func(args),
+        params = trace::params(args),
         loop_vars = iter::vars(args),
         loop_cond = iter::cond(args),
-        update_func = br::func(args),
+        update_func = trace::update(args),
         bh_check = bh::check(args),
         ad_check = ad::check(args))
     }
@@ -116,6 +121,8 @@ const float C = 1.0;
 const float R_s = 1.0;
 const float M = 0.5; /* must be R_s / 2 */
 const float G = 1.0;
+
+uniform vec3 src;
 
 in vec3 dir_v;
 in vec3 pos_v;
@@ -143,17 +150,19 @@ float pitch_coord(vec3 v) {
 "#;
 
     mod bg {
+        use clap::ArgMatches;
         enum Type {
             Black,
             Texture,
         }
 
-        pub fn func(s: &str) -> &str {
+        pub fn func(args: &ArgMatches) -> String {
+            let s = args.value_of("bg").unwrap_or("img");
             BGS[(match s {
                 "img" => Type::Texture,
                 "black" => Type::Black,
                 _ => panic!("Invalid bg type"),
-            }) as usize]
+            }) as usize].to_string()
         }
 
         const BGS: [&'static str; 2] = [
@@ -191,24 +200,70 @@ vec4 bg_col(vec3 dir) {
     }
 
     mod iter {
-        pub fn vars(args: &ArgMatches) -> &str {
+        use clap::ArgMatches;
+        pub fn vars(args: &ArgMatches) -> String {
             if args.is_present("flat") {
-                ""
+                "".to_string()
             } else {
                 /* need GR vars */
                 let out = r#"
-    vec3 h = cross(pos, cdir);
+    vec3 h = cross(pos, dir);
     float h2 = dot(h, h); /* angular momentum */
                 "#.to_string();
 
                 /* currently don't need anything else */
-                out.to_str()
+                out
             }
         }
 
-        pub fn cond(args: &ArgMatches) -> &str {
-            "while(dot(pos, pos) <= 
+        pub fn cond(args: &ArgMatches) -> String {
+            r#"while(dot(pos, pos) <= 15.0 * 15.0 &&
+                dot(pos, pos) >= 0.1 &&
+                alpha_rem >= 0.01)"#.to_string()
         }
+    }
+
+    mod trace {
+        use clap::ArgMatches;
+        pub fn params(args: &ArgMatches) -> String {
+            FLAT_PARAMS.to_string()
+        }
+
+        pub fn update(args: &ArgMatches) -> String {
+            FLAT_UPDATE.to_string()
+        }
+
+        const FLAT_PARAMS: &'static str = r#"
+            uniform float TIME_STEP;
+        "#;
+
+        const FLAT_UPDATE: &'static str = r#"
+            npos = pos + dir * TIME_STEP;
+            ndir = dir;
+        "#;
+    }
+
+    mod bh {
+        use clap::ArgMatches;
+        pub fn check(args: &ArgMatches) -> String {
+            FLAT_BH.to_string()
+        }
+
+        const FLAT_BH: &'static str = r#"
+            if(dot(npos, npos) <= R_s * R_s && dot(pos, pos) >= R_s * R_s) {
+                ccolor += vec4(0.0, 0.0, 0.0, 1.0) * alpha_rem * 1.0;
+                alpha_rem -= alpha_rem * 1.0;
+            }
+        "#;
+    }
+
+    mod ad {
+        use clap::ArgMatches;
+        pub fn check(args: &ArgMatches) -> String {
+            NO_DISK.to_string()
+        }
+
+        const NO_DISK: &'static str = "";
     }
 
 const DEFAULT_FRAG_SHADER: &'static str = r#"

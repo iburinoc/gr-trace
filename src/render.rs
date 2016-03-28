@@ -95,7 +95,6 @@ impl Renderer {
                 .sampled().wrap_function(glium::uniforms::SamplerWrapFunction::Repeat),
             NUM_ITER: num_iter,
             TIME_STEP: time_step,
-            FLAT: self.params.flat,
         };
 
         let params = glium::DrawParameters {
