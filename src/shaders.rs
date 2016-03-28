@@ -3,15 +3,15 @@ extern crate glium;
 
 use clap::ArgMatches;
 
-pub struct ShaderPair {
+pub struct Shader {
     vert_shader: String,
     frag_shader: String,
 }
 
-impl ShaderPair {
+impl Shader {
     pub fn construct(args: &ArgMatches) -> Self {
-        ShaderPair { vert_shader: ShaderPair::construct_vert_shader(args),
-                     frag_shader: ShaderPair::construct_frag_shader(args) }
+        Shader { vert_shader: Shader::construct_vert_shader(args),
+                 frag_shader: Shader::construct_frag_shader(args) }
     }
 
     fn construct_vert_shader(args: &ArgMatches) -> String {
@@ -19,7 +19,7 @@ impl ShaderPair {
     }
 
     fn construct_frag_shader(args: &ArgMatches) -> String {
-        "".to_string()
+        frag_shader::gen_shader(args)
     }
 
     pub fn compile<F>(self, display: &F) -> glium::Program
@@ -42,7 +42,7 @@ const DEFAULT_VERT_SHADER: &'static str = r#"
 #version 330
 
 in vec2 pos;
-out vec3 dir;
+out vec3 dir_v;
 out vec2 pos_v;
 
 uniform float height_ratio; // height / width
@@ -61,29 +61,65 @@ void main() {
 
 "#;
 
-const DEFAULT_FRAG_SHADER: &'static str = r#"
+mod frag_shader {
+    pub fn gen_shader(args: &ArgMatches) -> String {
+        format!(r#"
+{preamble}
 
+{bg_func}
+
+void main() {{
+    float alpha_rem = 1.0;
+    vec4 ccolor = vec4(0.0, 0.0, 0.0, 0.0);
+    vec3 dir = normalize(dir_v);
+    vec3 pos = src;
+
+    /* closest approach to BH */
+    float min_dist = length(cross(ndir, src));
+
+    {loop_vars}
+
+    {loop_cond} {{
+        vec3 npos, ndir;
+
+        {update_func}
+
+        {bh_check}
+        {ad_check}
+
+        pos = npos;
+        dir = ndir;
+    }}
+
+    ccolor += alpha_rem * bg_col(dir);
+
+    color = ccolor;
+}}
+
+    "#,
+        
+        preamble = PREAMBLE,
+        bg_func = bg::func(args),
+        loop_vars = iter::vars(args),
+        loop_cond = iter::cond(args),
+        update_func = br::func(args),
+        bh_check = bh::check(args),
+        ad_check = ad::check(args))
+    }
+
+    const PREAMBLE: &'static str = r#"
 #version 330
 
-#define M_PI 3.1415926535897932384626433832795
-
-in vec3 dir;
-
-out vec4 color;
-
-uniform sampler2D bgtex;
-uniform int NUM_ITER;
-uniform float TIME_STEP;
-
+#define M_PI (3.1415926535897932384626433832795)
 /* we set constants to convenient values for now */
 const float C = 1.0;
 const float R_s = 1.0;
 const float M = 0.5; /* must be R_s / 2 */
 const float G = 1.0;
 
-uniform bool FLAT;
-
-uniform vec3 src;
+in vec3 dir_v;
+in vec3 pos_v;
+out vec4 color;
 
 float atan2(float y, float x) {
     return x == 0.0 ? sign(y) * M_PI / 2 : atan(y, x);
@@ -104,6 +140,94 @@ float pitch(vec3 v) {
 float pitch_coord(vec3 v) {
     return (pitch(v) + M_PI / 2.) / M_PI;
 }
+"#;
+
+    mod bg {
+        enum Type {
+            Black,
+            Texture,
+        }
+
+        pub fn func(s: &str) -> &str {
+            BGS[(match s {
+                "img" => Type::Texture,
+                "black" => Type::Black,
+                _ => panic!("Invalid bg type"),
+            }) as usize]
+        }
+
+        const BGS: [&'static str; 2] = [
+        r#"
+vec4 bg_col(vec3 dir) {
+    return vec4(0.0, 0.0, 0.0, 1.0);
+}"#,
+            r#"
+
+uniform sampler2D bgtex;
+vec4 bg_col(vec3 dir) {
+    float x = yaw_coord(dir);
+    float y = pitch_coord(dir);
+
+    vec2 tex_coords = vec2(x, y);
+
+    float invert_x = x - 0.5;
+    invert_x = invert_x - sign(invert_x) * 0.5;
+    vec2 invert_coords = vec2(invert_x, y);
+
+    vec2 dx1 = dFdx(tex_coords);
+    vec2 dx2 = dFdx(invert_coords);
+
+    vec2 dy1 = dFdy(tex_coords);
+    vec2 dy2 = dFdy(invert_coords);
+
+    vec2 dx = dot(dx1, dx1) < dot(dx2, dx2) ? dx1 : dx2;
+    vec2 dy = dot(dy1, dy1) < dot(dy2, dy2) ? dy1 : dy2;
+
+    /* force the LOD so that GLSL doesn't flip out on the discontinuity
+       at the texture border */
+    return textureGrad(bgtex, tex_coords, dx, dy);
+}"#,
+        ];
+    }
+
+    mod iter {
+        pub fn vars(args: &ArgMatches) -> &str {
+            if args.is_present("flat") {
+                ""
+            } else {
+                /* need GR vars */
+                let out = r#"
+    vec3 h = cross(pos, cdir);
+    float h2 = dot(h, h); /* angular momentum */
+                "#.to_string();
+
+                /* currently don't need anything else */
+                out.to_str()
+            }
+        }
+
+        pub fn cond(args: &ArgMatches) -> &str {
+            "while(dot(pos, pos) <= 
+        }
+    }
+
+const DEFAULT_FRAG_SHADER: &'static str = r#"
+#version 330
+
+#define M_PI 3.1415926535897932384626433832795
+
+in vec3 dir;
+
+out vec4 color;
+
+uniform sampler2D bgtex;
+uniform int NUM_ITER;
+uniform float TIME_STEP;
+
+
+uniform bool FLAT;
+
+uniform vec3 src;
 
 vec4 bg_tex(vec3 dir) {
     float x = yaw_coord(dir);
@@ -209,7 +333,8 @@ void main() {
 
     "#;
 
-/*const GR_SHADER: ShaderPair = ShaderPair {
+}
+/*const GR_SHADER: Shader = Shader {
     vert_shader: r#"
 
 #version 140

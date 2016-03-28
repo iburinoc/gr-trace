@@ -4,13 +4,12 @@ extern crate image;
 extern crate cgmath;
 extern crate time;
 
-use glium::backend::glutin_backend::GlutinFacade;
 use glium::backend::Facade;
 use glium::{Surface, Frame};
 use clap::ArgMatches;
 use std::f32;
 
-use shaders::ShaderPair;
+use shaders::Shader;
 
 struct RenderParams {
     flat: bool,
@@ -44,11 +43,7 @@ impl Renderer {
             glium::texture::SrgbTexture2d::new(display, im).unwrap()
         };
 
-        let prog = {
-            //FIXME: add option for different shaders
-            let shaders = ShaderPair::construct(&args);
-            shaders.compile(display)
-        };
+        let prog = Shader::construct(args).compile(display);
 
         let bufs = {
             use glium::index::PrimitiveType::TrianglesList;
