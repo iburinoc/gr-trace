@@ -60,9 +60,6 @@ impl Renderer {
     }
 
     pub fn render(&self, mut target: Frame, t: f32) {
-        use time::precise_time_ns;
-
-        let start = precise_time_ns();
 
         target.clear_color(0., 0., 0., 0.0);
 
@@ -110,9 +107,6 @@ impl Renderer {
                     &uniforms, &params).unwrap();
 
         target.finish().unwrap();
-
-        let end = precise_time_ns();
-        println!("dt: {}ms", (end - start) as f32 / (1000000.0f32));
     }
 }
 

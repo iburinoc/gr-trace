@@ -25,22 +25,29 @@ mod settings {
 
 fn main() {
     let args = arg_handle();
-	let display = build_display().build_glium().unwrap();
+    let display = build_display().build_glium().unwrap();
 
     let renderer = render::Renderer::new(&display, &args);
 
     let mut f: f32 = 0.2;//std::f32::consts::PI;
-	loop {
+    loop {
+        use time::precise_time_ns;
+
+        let start = precise_time_ns();
         f += 0.002;
         renderer.render(display.draw(), f);
-		for ev in display.poll_events() {
+        display.finish();
+        let end = precise_time_ns();
+        println!("dt: {}ms", (end - start) as f32 / (1000000.0f32));
+
+        for ev in display.poll_events() {
             use glium::glutin::Event::*;
-			match ev {
-				Closed => return,
+            match ev {
+                Closed => return,
 				_ => ()
 			}
 		}
-        std::thread::sleep(std::time::Duration::from_millis(1000));
+        //std::thread::sleep(std::time::Duration::from_millis(1000));
 	}
 }
 
@@ -67,6 +74,13 @@ fn arg_handle<'a>() -> ArgMatches<'a> {
             .takes_value(true)
             .value_name("ITER_NUM")
             .default_value("1000"))
+        .arg(Arg::with_name("timestep")
+            .short("t")
+            .long("timestep")
+            .help("Sets the length of each time step (where c = 1)")
+            .takes_value(true)
+            .value_name("TIME_STEP")
+            .default_value("0.08"))
         .arg(Arg::with_name("out")
             .short("o")
             .long("out")
