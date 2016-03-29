@@ -83,6 +83,8 @@ void main() {{
 
     {loop_vars}
 
+    {trace_vars}
+
     {loop_cond} {{
         vec3 npos, ndir;
 
@@ -106,6 +108,7 @@ void main() {{
         bg_func = bg::func(args),
         params = trace::params(args),
         loop_vars = iter::vars(args),
+        trace_vars = trace::vars(args),
         loop_cond = iter::cond(args),
         update_func = trace::update(args),
         bh_check = bh::check(args),
@@ -146,6 +149,12 @@ float pitch(vec3 v) {
 
 float pitch_coord(vec3 v) {
     return (pitch(v) + M_PI / 2.) / M_PI;
+}
+
+float ts_func(float ts, vec3 pos) {
+    //float r2 = dot(pos,pos);
+    return ts;
+    //return ts * clamp(r2 / 2.25, 1.0, 10.0);
 }
 "#;
 
@@ -202,18 +211,7 @@ vec4 bg_col(vec3 dir) {
     mod iter {
         use clap::ArgMatches;
         pub fn vars(args: &ArgMatches) -> String {
-            if args.is_present("flat") {
-                "".to_string()
-            } else {
-                /* need GR vars */
-                let out = r#"
-    vec3 h = cross(pos, dir);
-    float h2 = dot(h, h); /* angular momentum */
-                "#.to_string();
-
-                /* currently don't need anything else */
-                out
-            }
+            "".to_string()
         }
 
         pub fn cond(args: &ArgMatches) -> String {
@@ -225,22 +223,74 @@ vec4 bg_col(vec3 dir) {
 
     mod trace {
         use clap::ArgMatches;
+        
+        enum Type {
+            Flat = 0,
+            Verlet = 1,
+        }
+
+        fn get_type(args: &ArgMatches) -> Type {
+            if args.is_present("flat") {
+                Type::Flat
+            } else {
+                match args.value_of("scheme").unwrap_or("verlet") {
+                    "verlet" => Type::Verlet,
+                    s => panic!("invalid integration scheme: {}", s),
+                }
+            }
+        }
+
         pub fn params(args: &ArgMatches) -> String {
-            FLAT_PARAMS.to_string()
+            PARAMS[get_type(args) as usize].to_string()
         }
 
         pub fn update(args: &ArgMatches) -> String {
-            FLAT_UPDATE.to_string()
+            UPDATES[get_type(args) as usize].to_string()
         }
 
-        const FLAT_PARAMS: &'static str = r#"
-            uniform float TIME_STEP;
-        "#;
+        pub fn vars(args: &ArgMatches) -> String {
+            VARS[get_type(args) as usize].to_string()
+        }
 
-        const FLAT_UPDATE: &'static str = r#"
-            npos = pos + dir * TIME_STEP;
+        const VARS: [&'static str; 2] = [
+            r#"
+            float time_step;
+            "#,
+            r#"
+            float time_step;
+            vec3 h = cross(pos, dir);
+            float h2 = dot(h, h);
+            "#,
+        ];
+
+        const PARAMS: [&'static str; 2] = [
+            r#"
+            uniform float TIME_STEP;
+        "#,
+            r#"
+            uniform float TIME_STEP;
+        "#,
+        ];
+
+        const UPDATES: [&'static str; 2] = [
+            r#"
+            time_step = ts_func(TIME_STEP, pos);
+            npos = pos + dir * time_step;
             ndir = dir;
-        "#;
+        "#,
+            r#"
+            time_step = ts_func(TIME_STEP, pos);
+            npos = pos + dir * time_step;
+            vec3 accel = -pos * 1.5 * h2 * pow(dot(pos, pos), -2.5);
+            ndir = dir + accel * time_step;
+            if(dot(ndir, ndir) > 100.0) {
+                /* experimental renormalization */
+                ndir = normalize(ndir);
+                h = cross(ndir, npos);
+                h2 = dot(h, h);
+            }
+        "#,
+        ];
     }
 
     mod bh {
@@ -250,7 +300,14 @@ vec4 bg_col(vec3 dir) {
         }
 
         const FLAT_BH: &'static str = r#"
-            if(dot(npos, npos) <= R_s * R_s && dot(pos, pos) >= R_s * R_s) {
+            float mindist2;
+            {
+                vec3 c = cross(npos, pos);
+                vec3 d = pos - npos;
+                mindist2 = dot(c, c) / dot(d, d);
+            }
+            //if(dot(npos, npos) <= R_s * R_s && dot(pos, pos) >= R_s * R_s) {
+            if(mindist2 <= R_s * R_s) {
                 ccolor += vec4(0.0, 0.0, 0.0, 1.0) * alpha_rem * 1.0;
                 alpha_rem -= alpha_rem * 1.0;
             }
