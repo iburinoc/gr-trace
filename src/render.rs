@@ -14,6 +14,7 @@ use shaders::Shader;
 struct RenderParams {
     flat: bool,
     iter: i32,
+    time_step: f32,
 }
 
 struct RenderBuffers(glium::VertexBuffer<RayVertex>, glium::IndexBuffer<u8>);
@@ -76,13 +77,6 @@ impl Renderer {
                 .transpose())
         };
 
-        let (num_iter, time_step) = {
-            let distance = 15.0f32; /* 2 * 15R_s, deflection is minimal by then */
-            let num_iter = self.params.iter; /* arbitrary */
-            
-            (num_iter, distance / (num_iter as f32))
-        };
-
         let uniforms = uniform! {
             height_ratio: (height as f32) / (width as f32),
             fov_ratio: (f32::consts::PI * 2. / 3. / 2.).tan(), // pi/2, 90 deg
@@ -90,8 +84,8 @@ impl Renderer {
             facing: facing_mat,
             tex: self.background
                 .sampled().wrap_function(glium::uniforms::SamplerWrapFunction::Repeat),
-            NUM_ITER: num_iter,
-            TIME_STEP: time_step,
+            NUM_ITER: self.params.iter,
+            TIME_STEP: self.params.time_step,
         };
 
         let params = glium::DrawParameters {
@@ -115,6 +109,7 @@ impl RenderParams {
         RenderParams {
             flat: args.is_present("flat"),
             iter: args.value_of("iter").unwrap().parse::<i32>().unwrap(),
+            time_step: args.value_of("timestep").unwrap().parse::<f32>().unwrap(),
         }
     }
 }

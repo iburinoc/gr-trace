@@ -227,14 +227,16 @@ vec4 bg_col(vec3 dir) {
         enum Type {
             Flat = 0,
             Verlet = 1,
+            Rk4 = 2,
         }
 
         fn get_type(args: &ArgMatches) -> Type {
             if args.is_present("flat") {
                 Type::Flat
             } else {
-                match args.value_of("scheme").unwrap_or("verlet") {
+                match args.value_of("method").unwrap_or("rk4") {
                     "verlet" => Type::Verlet,
+                    "rk4" => Type::Rk4,
                     s => panic!("invalid integration scheme: {}", s),
                 }
             }
@@ -252,7 +254,7 @@ vec4 bg_col(vec3 dir) {
             VARS[get_type(args) as usize].to_string()
         }
 
-        const VARS: [&'static str; 2] = [
+        const VARS: [&'static str; 3] = [
             r#"
             float time_step;
             "#,
@@ -261,18 +263,30 @@ vec4 bg_col(vec3 dir) {
             vec3 h = cross(pos, dir);
             float h2 = dot(h, h);
             "#,
+            r#"
+            float time_step;
+            vec3 h = cross(pos, dir);
+            float h2 = dot(h, h);
+            "#,
         ];
 
-        const PARAMS: [&'static str; 2] = [
+        const PARAMS: [&'static str; 3] = [
             r#"
             uniform float TIME_STEP;
         "#,
             r#"
             uniform float TIME_STEP;
         "#,
+            r#"
+            uniform float TIME_STEP;
+
+            vec3 accel(vec3 pos, float h2) {
+                return -pos * 1.5 * h2 * pow(dot(pos, pos), -2.5);
+            }
+        "#,
         ];
 
-        const UPDATES: [&'static str; 2] = [
+        const UPDATES: [&'static str; 3] = [
             r#"
             time_step = ts_func(TIME_STEP, pos);
             npos = pos + dir * time_step;
@@ -283,6 +297,35 @@ vec4 bg_col(vec3 dir) {
             npos = pos + dir * time_step;
             vec3 accel = -pos * 1.5 * h2 * pow(dot(pos, pos), -2.5);
             ndir = dir + accel * time_step;
+            if(dot(ndir, ndir) > 100.0) {
+                /* experimental renormalization */
+                ndir = normalize(ndir);
+                h = cross(ndir, npos);
+                h2 = dot(h, h);
+            }
+        "#,
+            r#"
+            time_step = ts_func(TIME_STEP, pos);
+            {
+                vec3 x1 = pos;
+                vec3 v1 = dir;
+                vec3 a1 = accel(x1, h2);
+
+                vec3 x2 = pos + 0.5 * v1 * time_step;
+                vec3 v2 = dir + 0.5 * a1 * time_step;
+                vec3 a2 = accel(x2, h2);
+
+                vec3 x3 = pos + 0.5 * v2 * time_step;
+                vec3 v3 = dir + 0.5 * a2 * time_step;
+                vec3 a3 = accel(x3, h2);
+
+                vec3 x4 = pos + v3 * time_step;
+                vec3 v4 = dir + a3 * time_step;
+                vec3 a4 = accel(x4, h2);
+
+                npos = pos + (time_step/6.0) * (v1 + 2*v2 + 2*v3 + v4);
+                ndir = dir + (time_step/6.0) * (a1 + 2*a2 + 2*a3 + a4);
+            }
             if(dot(ndir, ndir) > 100.0) {
                 /* experimental renormalization */
                 ndir = normalize(ndir);
