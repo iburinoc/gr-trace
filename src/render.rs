@@ -66,10 +66,10 @@ impl Renderer {
 
         let (width, height) = target.get_dimensions();
 
-        let src = [-10.0 * t.sin(),0.0,-10.0 * t.cos()];
+        let src = [-1.2 * t.sin(),0.0,-1.2 * t.cos()];
         let facing_mat = {
             use cgmath::*;
-            let dir = vec3(t.sin(), 0.0f32, t.cos());
+            let dir = vec3(t.cos(), 0.0f32, t.sin());
             let up = vec3(0.,1.,0.0f32);
 
             // cgmath returns a tranposed look_at matrix for some reason

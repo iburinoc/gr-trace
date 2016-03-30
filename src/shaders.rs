@@ -339,18 +339,21 @@ vec4 bg_col(vec3 dir) {
     mod bh {
         use clap::ArgMatches;
         pub fn check(args: &ArgMatches) -> String {
-            FLAT_BH.to_string()
+            BH_CHECK.to_string()
         }
 
-        const FLAT_BH: &'static str = r#"
+        const BH_CHECK: &'static str = r#"
             float mindist2;
+            float t;
             {
                 vec3 c = cross(npos, pos);
                 vec3 d = pos - npos;
                 mindist2 = dot(c, c) / dot(d, d);
+
+                t = dot(pos, d) / dot(d, d);
+
             }
-            //if(dot(npos, npos) <= R_s * R_s && dot(pos, pos) >= R_s * R_s) {
-            if(mindist2 <= R_s * R_s) {
+            if(mindist2 <= R_s * R_s && ((0 <= t && 1 >= t) || (dot(pos, pos) <= R_s * R_s))) {
                 ccolor += vec4(0.0, 0.0, 0.0, 1.0) * alpha_rem * 1.0;
                 alpha_rem -= alpha_rem * 1.0;
             }

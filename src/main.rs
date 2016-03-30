@@ -80,7 +80,7 @@ fn arg_handle<'a>() -> ArgMatches<'a> {
             .help("Sets the length of each time step (where c = 1)")
             .takes_value(true)
             .value_name("TIME_STEP")
-            .default_value("0.08"))
+            .default_value("0.64"))
         .arg(Arg::with_name("method")
             .short("m")
             .long("method")
