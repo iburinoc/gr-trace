@@ -353,7 +353,10 @@ vec4 bg_col(vec3 dir) {
                 t = dot(pos, d) / dot(d, d);
 
             }
-            if(mindist2 <= R_s * R_s && ((0 <= t && 1 >= t) || (dot(pos, pos) <= R_s * R_s))) {
+            if(mindist2 <= R_s * R_s && 
+                ((0 <= t && 1 >= t) ||
+                 (dot(pos, pos) <= R_s * R_s ||
+                  dot(npos, npos) <= R_s * R_s))) {
                 ccolor += vec4(0.0, 0.0, 0.0, 1.0) * alpha_rem * 1.0;
                 alpha_rem -= alpha_rem * 1.0;
             }
