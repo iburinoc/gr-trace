@@ -11,8 +11,9 @@ use std::f32;
 
 use shaders::Shader;
 
+use ::Camera;
+
 struct RenderParams {
-    flat: bool,
     iter: i32,
     time_step: f32,
 }
@@ -60,13 +61,13 @@ impl Renderer {
             params: RenderParams::new(args) }
     }
 
-    pub fn render(&self, mut target: Frame, t: f32) {
+    pub fn render(&self, mut target: Frame, camera: &Camera) {
 
         target.clear_color(0., 0., 0., 0.0);
 
         let (width, height) = target.get_dimensions();
 
-        let src = [-1.2 * t.sin(),0.0,-1.2 * t.cos()];
+/*        let src = (-1.2 * t.sin(),0.0,-1.2 * t.cos());
         let facing_mat = {
             use cgmath::*;
             let dir = vec3(t.cos(), 0.0f32, t.sin());
@@ -76,7 +77,16 @@ impl Renderer {
             Into::<[[f32;3];3]>::into(cgmath::Matrix3::look_at(dir, up)
                 .transpose())
         };
+*/
 
+        let (src, facing_mat) = {
+            use cgmath::Matrix;
+
+            let src = Into::<[f32;3]>::into(camera.pos);
+            let facing_mat = Into::<[[f32;3];3]>::into(camera.facing.transpose());
+
+            (src, facing_mat)
+        };
         let uniforms = uniform! {
             height_ratio: (height as f32) / (width as f32),
             fov_ratio: (f32::consts::PI * 2. / 3. / 2.).tan(), // pi/2, 90 deg
@@ -107,7 +117,6 @@ impl Renderer {
 impl RenderParams {
     fn new(args: &ArgMatches) -> Self {
         RenderParams {
-            flat: args.is_present("flat"),
             iter: args.value_of("iter").unwrap().parse::<i32>().unwrap(),
             time_step: args.value_of("timestep").unwrap().parse::<f32>().unwrap(),
         }

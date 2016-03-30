@@ -14,6 +14,7 @@ impl Shader {
                  frag_shader: Shader::construct_frag_shader(args) }
     }
 
+    #[allow(unused_variables)]
     fn construct_vert_shader(args: &ArgMatches) -> String {
         DEFAULT_VERT_SHADER.to_string()
     }

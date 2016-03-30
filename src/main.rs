@@ -5,13 +5,20 @@ extern crate image;
 extern crate cgmath;
 extern crate time;
 
-use glium::glutin::WindowBuilder;
+use glium::glutin::{WindowBuilder, VirtualKeyCode};
 use glium::DisplayBuild;
 use glium::backend::glutin_backend::GlutinFacade;
 
 use std::path::Path;
+use std::collections::HashSet;
+
+use time::precise_time_ns;
 
 use clap::{Arg, App, ArgMatches};
+
+use cgmath::{Matrix3, Vector3, vec3};
+
+use std::fmt;
 
 mod render;
 mod shaders;
@@ -29,26 +36,95 @@ fn main() {
 
     let renderer = render::Renderer::new(&display, &args);
 
-    let mut f: f32 = 0.2;//std::f32::consts::PI;
+    let mut camera = Camera{ 
+        pos: vec3(0.0, 0.0, -10.0f32),
+        facing: Matrix3::look_at(vec3(0., 0., 1.), vec3(0., 1., 0.)),
+    };
+
+    let mut prev = precise_time_ns();
+    let mut keys = HashSet::new();
     loop {
         use time::precise_time_ns;
 
-        let start = precise_time_ns();
-        f += 0.002;
-        renderer.render(display.draw(), f);
+        renderer.render(display.draw(), &camera);
         display.finish();
-        let end = precise_time_ns();
-        println!("dt: {}ms", (end - start) as f32 / (1000000.0f32));
+
+        let time = precise_time_ns();
+        let dt = (time - prev) as f32 / 1000000000.0f32;
+        prev = time;
 
         for ev in display.poll_events() {
             use glium::glutin::Event::*;
             match ev {
                 Closed => return,
+                KeyboardInput(s, _, o) => {
+                    if let Some(k) = o {
+                        use glium::glutin::ElementState;
+                        match s {
+                            ElementState::Pressed => keys.insert(k),
+                            ElementState::Released => keys.remove(&k),
+                        };
+                    }
+                },
 				_ => ()
 			}
 		}
-        //std::thread::sleep(std::time::Duration::from_millis(1000));
+
+        camera.update(&keys, dt);
+        println!("dt: {}ms cam: {}", dt * 1000.0f32, camera);
 	}
+}
+
+pub struct Camera {
+    pos: Vector3<f32>,
+    facing: Matrix3<f32>,
+}
+
+impl Camera {
+    fn update(&mut self, keys: &HashSet<VirtualKeyCode>, dt: f32) {
+        use cgmath::Rad;
+        use cgmath::Angle;
+        use cgmath::EuclideanVector;
+
+        let ang = Rad::new(1f32 * dt);
+        let dist = 3f32;
+
+        let mut vert = 0.0;
+        let mut hori = 0.0;
+        let mut depth = 0.0;
+        let mut yaw = Rad::zero();
+        let mut pitch = Rad::zero();
+        for &k in keys {
+            match k {
+                VirtualKeyCode::W => vert += 1.0,
+                VirtualKeyCode::S => vert -= 1.0,
+                VirtualKeyCode::A => hori -= 1.0,
+                VirtualKeyCode::D => hori += 1.0,
+                VirtualKeyCode::Q => depth -= 1.0,
+                VirtualKeyCode::E => depth += 1.0,
+                VirtualKeyCode::I => pitch = pitch + ang,
+                VirtualKeyCode::K => pitch = pitch - ang,
+                VirtualKeyCode::J => yaw = yaw + ang,
+                VirtualKeyCode::L => yaw = yaw - ang,
+                _ => (),
+            }
+        }
+
+        let mov = self.facing * vec3(hori, vert, depth);
+        let rot = Matrix3::from_euler(pitch, yaw, Rad::zero());
+
+        self.pos = self.pos + mov * dist * dt;
+        self.facing = self.facing * rot;
+    }
+}
+
+impl fmt::Display for Camera {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let pos = self.pos;
+        let fw = self.facing.z;
+        let up = self.facing.y;
+        write!(f, "pos: {:?} dir: {:?} up: {:?}", pos, fw, up)
+    }
 }
 
 fn build_display<'a>() -> WindowBuilder<'a> {
@@ -110,6 +186,7 @@ fn arg_handle<'a>() -> ArgMatches<'a> {
         .get_matches()
 }
 
+#[allow(dead_code)]
 fn write_img(display: &GlutinFacade, path: &str) {
     let image: glium::texture::RawImage2d<u8> = display.read_front_buffer();
     let image = image::ImageBuffer::from_raw(image.width, image.height, image.data.into_owned()).unwrap();
