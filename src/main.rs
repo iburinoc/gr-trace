@@ -84,10 +84,10 @@ impl Camera {
     fn update(&mut self, keys: &HashSet<VirtualKeyCode>, dt: f32) {
         use cgmath::Rad;
         use cgmath::Angle;
-        use cgmath::EuclideanVector;
+        use cgmath::SquareMatrix;
 
         let ang = Rad::new(1f32 * dt);
-        let dist = 3f32;
+        let mut dist = 0.2f32;
 
         let mut vert = 0.0;
         let mut hori = 0.0;
@@ -102,19 +102,20 @@ impl Camera {
                 VirtualKeyCode::D => hori += 1.0,
                 VirtualKeyCode::Q => depth -= 1.0,
                 VirtualKeyCode::E => depth += 1.0,
+                VirtualKeyCode::LShift => dist = 2f32,
                 VirtualKeyCode::I => pitch = pitch + ang,
                 VirtualKeyCode::K => pitch = pitch - ang,
-                VirtualKeyCode::J => yaw = yaw + ang,
-                VirtualKeyCode::L => yaw = yaw - ang,
+                VirtualKeyCode::J => yaw = yaw - ang,
+                VirtualKeyCode::L => yaw = yaw + ang,
                 _ => (),
             }
         }
 
-        let mov = self.facing * vec3(hori, vert, depth);
+        let mov = self.facing.invert().unwrap() * vec3(hori, vert, depth);
         let rot = Matrix3::from_euler(pitch, yaw, Rad::zero());
 
         self.pos = self.pos + mov * dist * dt;
-        self.facing = self.facing * rot;
+        self.facing = (self.facing.invert().unwrap() * rot).invert().unwrap();
     }
 }
 
