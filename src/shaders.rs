@@ -217,7 +217,6 @@ vec4 bg_col(vec3 dir) {
 
         pub fn cond(args: &ArgMatches) -> String {
             r#"while(dot(pos, pos) <= 15.0 * 15.0 &&
-                dot(pos, pos) >= 0.1 &&
                 alpha_rem >= 0.01)"#.to_string()
         }
     }
@@ -344,33 +343,64 @@ vec4 bg_col(vec3 dir) {
         }
 
         const BH_CHECK: &'static str = r#"
+            {
             float mindist2;
             float t;
+            vec3 closest;
             {
                 vec3 c = cross(npos, pos);
                 vec3 d = pos - npos;
                 mindist2 = dot(c, c) / dot(d, d);
 
                 t = dot(pos, d) / dot(d, d);
+                t = clamp(t, 0.0, 1.0);
+                closest = pos + t * (npos - pos);
 
             }
-            if(mindist2 <= R_s * R_s && 
-                ((0 <= t && 1 >= t) ||
-                 (dot(pos, pos) <= R_s * R_s ||
-                  dot(npos, npos) <= R_s * R_s))) {
+            if(dot(closest, closest) <= R_s * R_s) {
                 ccolor += vec4(0.0, 0.0, 0.0, 1.0) * alpha_rem * 1.0;
                 alpha_rem -= alpha_rem * 1.0;
+            }
             }
         "#;
     }
 
     mod ad {
         use clap::ArgMatches;
-        pub fn check(args: &ArgMatches) -> String {
-            NO_DISK.to_string()
+        enum Type {
+            NoDisk = 0,
+            White = 1,
         }
 
-        const NO_DISK: &'static str = "";
+        fn get_type(args: &ArgMatches) -> Type {
+            match args.value_of("accdisk").unwrap_or("white") {
+                "none" => Type::NoDisk,
+                "white" => Type::White,
+                s => panic!("invalid accretion disk type: {}", s),
+            }
+        }
+
+        pub fn check(args: &ArgMatches) -> String {
+            CHECKS[get_type(args) as usize].to_string()
+        }
+
+        const CHECKS: [&'static str; 2] = [
+            r#"
+        "#,
+            r#"
+            {
+            float t = -pos.y / (npos.y - pos.y);
+            if(t >= 0 && t <= 1) {
+                vec3 p = pos + t * (npos - pos);
+                float mag = length(p);
+                if(mag >= 3 && mag <= 5) {
+                    ccolor += vec4(1.0, 1.0, 1.0, 1.0) * alpha_rem * 0.6;
+                    alpha_rem -= alpha_rem * 0.6;
+                }
+            }
+            }
+        "#,
+        ];
     }
 
 const DEFAULT_FRAG_SHADER: &'static str = r#"
