@@ -71,7 +71,9 @@ mod frag_shader {
 
 {bg_func}
 
-{params}
+{trace_params}
+
+{ad_params}
 
 void main() {{
     float alpha_rem = 1.0;
@@ -107,7 +109,8 @@ void main() {{
         
         preamble = PREAMBLE,
         bg_func = bg::func(args),
-        params = trace::params(args),
+        trace_params = trace::params(args),
+        ad_params = ad::params(args),
         loop_vars = iter::vars(args),
         trace_vars = trace::vars(args),
         loop_cond = iter::cond(args),
@@ -182,7 +185,7 @@ vec4 bg_col(vec3 dir) {
 }"#,
             r#"
 
-uniform sampler2D bgtex;
+uniform sampler2D bg_tex;
 vec4 bg_col(vec3 dir) {
     float x = yaw_coord(dir);
     float y = pitch_coord(dir);
@@ -204,7 +207,7 @@ vec4 bg_col(vec3 dir) {
 
     /* force the LOD so that GLSL doesn't flip out on the discontinuity
        at the texture border */
-    return textureGrad(bgtex, tex_coords, dx, dy);
+    return textureGrad(bg_tex, tex_coords, dx, dy);
 }"#,
         ];
     }
@@ -370,191 +373,85 @@ vec4 bg_col(vec3 dir) {
         enum Type {
             NoDisk = 0,
             White = 1,
+            Tex = 2,
         }
 
         fn get_type(args: &ArgMatches) -> Type {
             match args.value_of("accdisk").unwrap_or("white") {
                 "none" => Type::NoDisk,
                 "white" => Type::White,
+                "img" => Type::Tex,
                 s => panic!("invalid accretion disk type: {}", s),
             }
         }
 
         pub fn check(args: &ArgMatches) -> String {
-            CHECKS[get_type(args) as usize].to_string()
+            CHECK.to_string()
         }
 
-        const CHECKS: [&'static str; 2] = [
-            r#"
-        "#,
-            r#"
+        pub fn params(args: &ArgMatches) -> String {
+            let or: f32 = args.value_of("oradius").unwrap().parse().unwrap();
+            let ir: f32 = args.value_of("iradius").unwrap().parse().unwrap();
+            let extra = PARAMS[get_type(args) as usize].to_string();
+            format!(r#"
+                const float DISK_O_RAD = {};
+                const float DISK_I_RAD = {};
+                {}
+                "#, or, ir, extra)
+        }
+
+        const CHECK: &'static str = r#"
             {
             float t = -pos.y / (npos.y - pos.y);
             if(t >= 0 && t <= 1) {
                 vec3 p = pos + t * (npos - pos);
                 float mag = length(p);
-                if(mag >= 3 && mag <= 5) {
-                    ccolor += vec4(1.0, 1.0, 1.0, 1.0) * alpha_rem * 0.6;
-                    alpha_rem -= alpha_rem * 0.6;
+                if(mag >= DISK_I_RAD && mag <= DISK_O_RAD) {
+                    vec4 col = ad_col(p, mag);
+                    float rat = col.a;
+                    ccolor += col * alpha_rem;
+                    alpha_rem -= alpha_rem * rat;
                 }
             }
+            }
+        "#;
+
+        const PARAMS: [&'static str; 3] = [
+            r#"
+            vec4 ad_col(vec3 intersect) {
+                return vec4(0.0, 0.0, 0.0, 0.0);
+            }
+        "#,
+            r#"
+            vec4 ad_col(vec3 intersect, float mag) {
+                return vec4(1.0, 1.0, 1.0, 1.0);
+            }
+        "#,
+            r#"
+            uniform sampler2D ad_tex;
+            vec4 ad_col(vec3 intersect, float mag) {
+                float x = atan2(intersect.x, intersect.z);
+                float y = (DISK_O_RAD - mag) / (DISK_O_RAD - DISK_I_RAD);
+
+                float invert_x = x - 0.5;
+                invert_x = invert_x - sign(invert_x) * 0.5;
+
+                vec2 c1 = vec2(x, y);
+                vec2 c2 = vec2(invert_x, y);
+
+                vec2 dx1 = dFdx(c1);
+                vec2 dx2 = dFdx(c2);
+
+                vec2 dy1 = dFdy(c1);
+                vec2 dy2 = dFdy(c2);
+
+                vec2 dx = dot(dx1, dx1) < dot(dx2, dx2) ? dx1 : dx2;
+                vec2 dy = dot(dy1, dy1) < dot(dy2, dy2) ? dy1 : dy2;
+
+                return textureGrad(ad_tex, c1, dx, dy);
             }
         "#,
         ];
     }
-
-const DEFAULT_FRAG_SHADER: &'static str = r#"
-#version 330
-
-#define M_PI 3.1415926535897932384626433832795
-
-in vec3 dir;
-
-out vec4 color;
-
-uniform sampler2D bgtex;
-uniform int NUM_ITER;
-uniform float TIME_STEP;
-
-
-uniform bool FLAT;
-
-uniform vec3 src;
-
-vec4 bg_tex(vec3 dir) {
-    float x = yaw_coord(dir);
-    float y = pitch_coord(dir);
-
-    vec2 tex_coords = vec2(x, y);
-
-    float invert_x = x - 0.5;
-    invert_x = invert_x - sign(invert_x) * 0.5;
-    vec2 invert_coords = vec2(invert_x, y);
-
-    vec2 dx1 = dFdx(tex_coords);
-    vec2 dx2 = dFdx(invert_coords);
-
-    vec2 dy1 = dFdy(tex_coords);
-    vec2 dy2 = dFdy(invert_coords);
-
-    vec2 dx = dot(dx1, dx1) < dot(dx2, dx2) ? dx1 : dx2;
-    vec2 dy = dot(dy1, dy1) < dot(dy2, dy2) ? dy1 : dy2;
-
-    /* force the LOD so that GLSL doesn't flip out on the discontinuity
-       at the texture border */
-    return textureGrad(bgtex, tex_coords, dx, dy);
 }
-
-const vec4 ZERO = vec4(0.0, 0.0, 0.0, 0.0);
-
-const float TDIST = 20.0;
-const float BTHRESHOLD = 0.9;
-const float TTHRESHOLD = 0.95;
-const float M_RAT = 8;
-
-void main() {
-    float cdist = 0.0;
-    float ratio = 1.0;
-    vec3 ndir = normalize(dir);
-
-    /* closest approach to BH */
-    float dist = length(cross(ndir, src));
-
-    /* test iteration function */
-    int num_iter = int((1 / (1 + dist * 0.2)) * NUM_ITER);
-
-    float alpha_rem = 1.0;
-    vec4 ccolor = vec4(0.0, 0.0, 0.0, 0.0);
-    vec3 cdir = ndir; /* current direction */
-
-    vec3 pos = src;
-    vec3 h = cross(pos, cdir);
-    float h2 = dot(h, h); /* angular momentum */
-
-    while(cdist < TDIST) {
-        vec3 npos = pos + cdir * TIME_STEP * ratio;
-        cdist += TIME_STEP * ratio;
-        if(!FLAT) {
-            vec3 accel = -pos * 1.5 * h2 * pow(dot(pos, pos), -2.5);
-            vec3 ncdir = cdir + accel * TIME_STEP * ratio;
-            ncdir = normalize(ncdir);
-            h = cross(pos, ncdir);
-            h2 = dot(h, h);
-            if(dot(ncdir, cdir) < BTHRESHOLD && ratio > (1/M_RAT)) {
-                ratio *= 0.5;
-            } else if(dot(ncdir, cdir) > TTHRESHOLD && ratio < M_RAT) {
-                ratio *= 2;
-            }
-            cdir = ncdir;
-        }
-
-        /* check if its within a black hole */
-        if(length(npos) <= R_s) {
-            ccolor += alpha_rem * vec4(0.0, 0.0, 0.0, 1.0);
-            alpha_rem *= 0.0;
-        }
-
-        pos = npos;
-    }
-/*
-    for(int i = 0; i < num_iter; i++) {
-        vec3 npos = pos + cdir * TIME_STEP;
-        if(!FLAT) {
-            vec3 accel = -pos * 1.5 * h2 * pow(dot(pos, pos), -2.5);
-            cdir = cdir + accel * TIME_STEP;
-            cdir = normalize(cdir);
-            h = cross(pos, cdir);
-            h2 = dot(h, h);
-            //cdir = cdir + accel * TIME_STEP;
-        }
-
-        /* check if its within a black hole */
-  /*      if(length(npos) <= R_s) {
-            ccolor += alpha_rem * vec4(0.0, 0.0, 1.0, 1.0);
-            alpha_rem *= 0.0;
-        }
-
-        pos = npos;
-    }*/
-    cdir = normalize(cdir);
-
-    ccolor += alpha_rem * bg_tex(cdir);
-
-    color = ccolor;
-}
-
-    "#;
-
-}
-/*const GR_SHADER: Shader = Shader {
-    vert_shader: r#"
-
-#version 140
-
-in vec2 pos;
-out vec2 pos_v;
-
-void main() {
-    pos_v = pos;
-
-    gl_Position = vec4(pos, 0.0, 1.0);
-}
-
-    "#,
-    frag_shader: r#"
-
-#version 140
-
-in vec2 pos_v;
-
-out vec4 color;
-
-void main() {
-    float red = (pos_v.x + 1) / 2.;
-    float green = (pos_v.y + 1) / 2.;
-    color = vec4(red, green, 0.0, 1.0);
-}
-
-    "#,
-};*/
 

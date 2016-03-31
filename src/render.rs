@@ -22,6 +22,7 @@ struct RenderBuffers(glium::VertexBuffer<RayVertex>, glium::IndexBuffer<u8>);
 pub struct Renderer {
     program: glium::Program,
     background: glium::texture::SrgbTexture2d,
+    disk: glium::texture::SrgbTexture2d,
 
     buffers: RenderBuffers,
 
@@ -49,6 +50,19 @@ impl Renderer {
             glium::texture::SrgbTexture2d::new(display, im).unwrap()
         };
 
+        let ad = {
+            use std::io::Cursor;
+
+            let bytes = &include_bytes!("../resources/ad.jpg")[..];
+            let im = image::load(Cursor::new(bytes),
+                                 image::JPEG).unwrap().to_rgba();
+
+            let imdim = im.dimensions();
+            let im = glium::texture::RawImage2d::from_raw_rgba_reversed(
+                        im.into_raw(), imdim);
+            glium::texture::SrgbTexture2d::new(display, im).unwrap()
+        };
+
         let prog = Shader::construct(args).compile(display);
 
         let bufs = {
@@ -57,8 +71,8 @@ impl Renderer {
              glium::IndexBuffer::new(display, TrianglesList, &INDICES).unwrap())
         };
 
-        Renderer { program: prog, background: bg, buffers: bufs,
-            params: RenderParams::new(args) }
+        Renderer { program: prog, background: bg, disk: ad,
+            buffers: bufs, params: RenderParams::new(args) }
     }
 
     pub fn render(&self, mut target: Frame, camera: &Camera) {
@@ -92,8 +106,10 @@ impl Renderer {
             fov_ratio: (f32::consts::PI * 2. / 3. / 2.).tan(), // pi/2, 90 deg
             src: src,
             facing: facing_mat,
-            tex: self.background
+            bg_tex: self.background
                 .sampled().wrap_function(glium::uniforms::SamplerWrapFunction::Repeat),
+            ad_tex: self.disk
+                .sampled().wrap_function(glium::uniforms::SamplerWrapFunction::Clamp),
             NUM_ITER: self.params.iter,
             TIME_STEP: self.params.time_step,
         };
