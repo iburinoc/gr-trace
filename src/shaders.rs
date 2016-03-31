@@ -219,7 +219,8 @@ vec4 bg_col(vec3 dir) {
         }
 
         pub fn cond(args: &ArgMatches) -> String {
-            r#"while(dot(pos, pos) <= 15.0 * 15.0 &&
+            r#"float border = max(15.0 * 15.0, dot(src, src));
+            while(dot(pos, pos) <= border &&
                 alpha_rem >= 0.01)"#.to_string()
         }
     }
