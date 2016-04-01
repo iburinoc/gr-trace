@@ -109,7 +109,9 @@ impl Renderer {
             bg_tex: self.background
                 .sampled().wrap_function(glium::uniforms::SamplerWrapFunction::Repeat),
             ad_tex: self.disk
-                .sampled().wrap_function(glium::uniforms::SamplerWrapFunction::Clamp),
+                .sampled().wrap_function(glium::uniforms::SamplerWrapFunction::Clamp)
+                .minify_filter(glium::uniforms::MinifySamplerFilter::Nearest)
+                .magnify_filter(glium::uniforms::MagnifySamplerFilter::Linear),
             NUM_ITER: self.params.iter,
             TIME_STEP: self.params.time_step,
         };
