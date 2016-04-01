@@ -431,7 +431,7 @@ vec4 bg_col(vec3 dir) {
             r#"
             uniform sampler2D ad_tex;
             vec4 ad_col(vec3 intersect, float mag) {
-                float x = atan2(intersect.x, intersect.z);
+                float x = yaw_coord(intersect);
                 float y = (DISK_O_RAD - mag) / (DISK_O_RAD - DISK_I_RAD);
 
                 float invert_x = x - 0.5;

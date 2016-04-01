@@ -94,6 +94,7 @@ impl Camera {
         let mut depth = 0.0;
         let mut yaw = Rad::zero();
         let mut pitch = Rad::zero();
+        let mut roll = Rad::zero();
         for &k in keys {
             match k {
                 VirtualKeyCode::W => vert += 1.0,
@@ -107,12 +108,14 @@ impl Camera {
                 VirtualKeyCode::K => pitch = pitch - ang,
                 VirtualKeyCode::J => yaw = yaw - ang,
                 VirtualKeyCode::L => yaw = yaw + ang,
+                VirtualKeyCode::U => roll = roll + ang,
+                VirtualKeyCode::O => roll = roll - ang,
                 _ => (),
             }
         }
 
         let mov = self.facing.invert().unwrap() * vec3(hori, vert, depth);
-        let rot = Matrix3::from_euler(pitch, yaw, Rad::zero());
+        let rot = Matrix3::from_euler(pitch, yaw, roll);
 
         self.pos = self.pos + mov * dist * dt;
         self.facing = (self.facing.invert().unwrap() * rot).invert().unwrap();
