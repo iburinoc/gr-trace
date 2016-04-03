@@ -53,9 +53,9 @@ impl Renderer {
         let ad = {
             use std::io::Cursor;
 
-            let bytes = &include_bytes!("../resources/ad.jpg")[..];
+            let bytes = &include_bytes!("../resources/ad.png")[..];
             let im = image::load(Cursor::new(bytes),
-                                 image::JPEG).unwrap().to_rgba();
+                                 image::PNG).unwrap().to_rgba();
 
             let imdim = im.dimensions();
             let im = glium::texture::RawImage2d::from_raw_rgba_reversed(
