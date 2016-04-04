@@ -419,7 +419,7 @@ vec4 bg_col(vec3 dir) {
 
         const PARAMS: [&'static str; 3] = [
             r#"
-            vec4 ad_col(vec3 intersect) {
+            vec4 ad_col(vec3 intersect, float mag) {
                 return vec4(0.0, 0.0, 0.0, 0.0);
             }
         "#,
@@ -449,6 +449,7 @@ vec4 bg_col(vec3 dir) {
                 vec2 dx = dot(dx1, dx1) < dot(dx2, dx2) ? dx1 : dx2;
                 vec2 dy = dot(dy1, dy1) < dot(dy2, dy2) ? dy1 : dy2;
 
+                return textureGrad(ad_tex, c1, dx, dy);
                 vec3 col = vec3(textureGrad(ad_tex, c1, dx, dy));
                 float alpha = clamp(dot(col, col)/3.0, 0.0, 1.0);
                 return vec4(col, alpha);
