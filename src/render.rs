@@ -75,23 +75,11 @@ impl Renderer {
             buffers: bufs, params: RenderParams::new(args) }
     }
 
-    pub fn render(&self, mut target: Frame, camera: &Camera) {
+    pub fn render(&self, mut target: Frame, camera: &Camera, time: f32) {
 
         target.clear_color(0., 0., 0., 0.0);
 
         let (width, height) = target.get_dimensions();
-
-/*        let src = (-1.2 * t.sin(),0.0,-1.2 * t.cos());
-        let facing_mat = {
-            use cgmath::*;
-            let dir = vec3(t.cos(), 0.0f32, t.sin());
-            let up = vec3(0.,1.,0.0f32);
-
-            // cgmath returns a tranposed look_at matrix for some reason
-            Into::<[[f32;3];3]>::into(cgmath::Matrix3::look_at(dir, up)
-                .transpose())
-        };
-*/
 
         let (src, facing_mat) = {
             use cgmath::Matrix;
@@ -114,6 +102,7 @@ impl Renderer {
                 .magnify_filter(glium::uniforms::MagnifySamplerFilter::Linear),
             NUM_ITER: self.params.iter,
             TIME_STEP: self.params.time_step,
+            time: time,
         };
 
         let params = glium::DrawParameters {

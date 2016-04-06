@@ -130,6 +130,7 @@ const float M = 0.5; /* must be R_s / 2 */
 const float G = 1.0;
 
 uniform vec3 src;
+uniform float time;
 
 in vec3 dir_v;
 in vec3 pos_v;
@@ -375,13 +376,15 @@ vec4 bg_col(vec3 dir) {
             NoDisk = 0,
             White = 1,
             Tex = 2,
+            Dynamic = 3,
         }
 
         fn get_type(args: &ArgMatches) -> Type {
-            match args.value_of("accdisk").unwrap_or("white") {
+            match args.value_of("accdisk").unwrap() {
                 "none" => Type::NoDisk,
                 "white" => Type::White,
                 "img" => Type::Tex,
+                "dyno" => Type::Dynamic,
                 s => panic!("invalid accretion disk type: {}", s),
             }
         }
@@ -410,14 +413,14 @@ vec4 bg_col(vec3 dir) {
                 if(mag >= DISK_I_RAD && mag <= DISK_O_RAD) {
                     vec4 col = ad_col(p, mag);
                     float rat = col.a;
-                    ccolor += col * alpha_rem;
+                    ccolor += col * alpha_rem * rat;
                     alpha_rem -= alpha_rem * rat;
                 }
             }
             }
         "#;
 
-        const PARAMS: [&'static str; 3] = [
+        const PARAMS: [&'static str; 4] = [
             r#"
             vec4 ad_col(vec3 intersect, float mag) {
                 return vec4(0.0, 0.0, 0.0, 0.0);
@@ -432,6 +435,69 @@ vec4 bg_col(vec3 dir) {
             uniform sampler2D ad_tex;
             vec4 ad_col(vec3 intersect, float mag) {
                 float x = yaw_coord(intersect);
+                float y = (DISK_O_RAD - mag) / (DISK_O_RAD - DISK_I_RAD);
+
+                float invert_x = x - 0.5;
+                invert_x = invert_x - sign(invert_x) * 0.5;
+
+                vec2 c1 = vec2(x, y);
+                vec2 c2 = vec2(invert_x, y);
+
+                vec2 dx1 = dFdx(c1);
+                vec2 dx2 = dFdx(c2);
+
+                vec2 dy1 = dFdy(c1);
+                vec2 dy2 = dFdy(c2);
+
+                vec2 dx = dot(dx1, dx1) < dot(dx2, dx2) ? dx1 : dx2;
+                vec2 dy = dot(dy1, dy1) < dot(dy2, dy2) ? dy1 : dy2;
+
+                return textureGrad(ad_tex, c1, dx, dy);
+                vec3 col = vec3(textureGrad(ad_tex, c1, dx, dy));
+                float alpha = clamp(dot(col, col)/3.0, 0.0, 1.0);
+                return vec4(col, alpha);
+            }
+        "#,
+            r#"
+            uniform sampler2D ad_tex;
+            float true_ang(float phi_p, float mag) {
+                float omega = 0.7071 * pow(mag, -1.5); /* keplerian vel */
+
+                return mod(phi_p + omega * time * 5, 2 * M_PI);
+            }
+
+            float integrate(float phi_p, float mag) {
+                float val = 0;
+                float total = 0;
+                int N = 30;
+                float step = (DISK_O_RAD-DISK_I_RAD)/N;
+                for(int i = 0; i < N; i++) {
+                    float r = mod(mag - DISK_I_RAD, step) + step * i + DISK_I_RAD;
+                    float y = 1.0 - i / N;
+                    float omega = 0.7071*pow(r, -1.5)*5;
+                    float x = mod((phi_p + omega*time)/(2*M_PI), 1.0);
+
+                    vec4 col = texture(ad_tex, vec2(x, y));
+                    float j = col.x * omega;
+                    float dr = (r - mag);
+                    val += sign(dr) * j / max(abs(dr), 0.2) * step;
+                }
+
+                return val * 10;
+            }
+
+            vec4 ad_col(vec3 intersect, float mag) {
+                float phi_prime = yaw(intersect);
+                float val = integrate(phi_prime, mag);
+
+                return vec4(val, clamp(val * 2 - 1.0, 0.0, 1.0), clamp(val * 2 - 1.0, 0.0, 1.0), val);
+            }
+
+            vec4 ad_col1(vec3 intersect, float mag) {
+                float phi_prime = yaw(intersect);
+                float phi = true_ang(phi_prime, mag);
+
+                float x = phi / (2. * M_PI);
                 float y = (DISK_O_RAD - mag) / (DISK_O_RAD - DISK_I_RAD);
 
                 float invert_x = x - 0.5;

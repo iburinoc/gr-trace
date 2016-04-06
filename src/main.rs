@@ -41,12 +41,14 @@ fn main() {
         facing: Matrix3::look_at(vec3(0., 0., 1.), vec3(0., 1., 0.)),
     };
 
+    let start = precise_time_ns();
     let mut prev = precise_time_ns();
     let mut keys = HashSet::new();
     loop {
         use time::precise_time_ns;
 
-        renderer.render(display.draw(), &camera);
+        let time = (precise_time_ns() - start) as f32 / 1000000000.0f32;
+        renderer.render(display.draw(), &camera, time);
         display.finish();
 
         let time = precise_time_ns();
@@ -72,6 +74,12 @@ fn main() {
 
         camera.update(&keys, dt);
         println!("dt: {}ms cam: {}", dt * 1000.0f32, camera);
+
+        if keys.contains(&VirtualKeyCode::Q) &&
+            keys.contains(&VirtualKeyCode::LWin) {
+
+            break
+        }
 	}
 }
 
@@ -186,10 +194,11 @@ fn arg_handle<'a>() -> ArgMatches<'a> {
             .help("Sets the type of accretion disk used")
             .takes_value(true)
             .value_name("TYPE")
-            .default_value("img")
+            .default_value("dyno")
                 .possible_value("none")
                 .possible_value("white")
-                .possible_value("img"))
+                .possible_value("img")
+                .possible_value("dyno"))
         .arg(Arg::with_name("iradius")
             .long("ir")
             .help("Sets the inner radius of the accretion disk")
