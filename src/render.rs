@@ -89,6 +89,7 @@ impl Renderer {
 
             (src, facing_mat)
         };
+
         let uniforms = uniform! {
             height_ratio: (height as f32) / (width as f32),
             fov_ratio: (f32::consts::PI * 2. / 3. / 2.).tan(), // pi/2, 90 deg

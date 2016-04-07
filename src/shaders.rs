@@ -16,7 +16,7 @@ impl Shader {
 
     #[allow(unused_variables)]
     fn construct_vert_shader(args: &ArgMatches) -> String {
-        DEFAULT_VERT_SHADER.to_string()
+        vert_shader::gen_shader(args)
     }
 
     fn construct_frag_shader(args: &ArgMatches) -> String {
@@ -61,6 +61,55 @@ void main() {
 }
 
 "#;
+
+#[allow(unused_variables)]
+mod vert_shader {
+    use clap::ArgMatches;
+    pub fn gen_shader(args: &ArgMatches) -> String {
+        format!(r#"
+            {preamble}
+
+            {params}
+
+            {main}
+        "#,
+            preamble = PREAMBLE,
+            params = params(args),
+            main = MAIN)
+    }
+
+    const PREAMBLE: &'static str = r#"
+    #version 330
+
+    in vec2 pos;
+    out vec3 dir_v;
+    out vec2 pos_v;
+
+    uniform float height_ratio; // height / width
+    uniform mat3 facing;
+    "#;
+
+    const MAIN: &'static str = r#"
+    void main() {
+        float x = pos.x * fov_ratio;
+        float y = pos.y * fov_ratio * height_ratio;
+        dir_v = facing * vec3(x, y, 1.0);
+        pos_v = pos;
+
+        gl_Position = vec4(pos, 0.0, 1.0);
+    }
+    "#;
+
+    fn params(args: &ArgMatches) -> String {
+        use std::f32;
+        let fov: f32 = args.value_of("fov").unwrap().parse().unwrap();
+        let rat = (fov / 2.0f32 / 180.0f32 * f32::consts::PI).tan();
+        format!(r#"
+            const float fov_ratio = {};
+        "#,
+            rat)
+    }
+}
 
 #[allow(unused_variables)]
 mod frag_shader {
@@ -172,11 +221,18 @@ float ts_func(float ts, vec3 pos) {
 
         pub fn func(args: &ArgMatches) -> String {
             let s = args.value_of("bg").unwrap_or("img");
-            BGS[(match s {
+            let rat: f32 = args.value_of("bgrat").unwrap().parse().unwrap();
+            format!(r#"
+                const float BG_RAT = {rat};
+
+                {func}
+            "#,
+            rat = rat,
+            func = BGS[(match s {
                 "img" => Type::Texture,
                 "black" => Type::Black,
                 _ => panic!("Invalid bg type"),
-            }) as usize].to_string()
+            }) as usize].to_string())
         }
 
         const BGS: [&'static str; 2] = [
@@ -208,7 +264,8 @@ vec4 bg_col(vec3 dir) {
 
     /* force the LOD so that GLSL doesn't flip out on the discontinuity
        at the texture border */
-    return textureGrad(bg_tex, tex_coords, dx, dy);
+    vec4 res = textureGrad(bg_tex, tex_coords, dx, dy);
+    return vec4(vec3(res) * BG_RAT, res.a);
 }"#,
         ];
     }
