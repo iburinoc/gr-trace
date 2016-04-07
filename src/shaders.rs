@@ -488,9 +488,14 @@ vec4 bg_col(vec3 dir) {
 
             vec4 ad_col(vec3 intersect, float mag) {
                 float phi_prime = yaw(intersect);
-                float val = integrate(phi_prime, mag);
+                //float val1 = integrate(phi_prime, mag);
 
-                return vec4(val, clamp(val * 2 - 1.0, 0.0, 1.0), clamp(val * 2 - 1.0, 0.0, 1.0), val);
+                float phi = true_ang(phi_prime, mag);
+                float x = phi / (2. * M_PI);
+                float y = (DISK_O_RAD - mag) / (DISK_O_RAD - DISK_I_RAD);
+                float val = texture(ad_tex, vec2(x, y)).r * 10;
+
+                return vec4(val, clamp(val * 2 - 1.0, 0.0, 1.0), clamp(val * 3 - 2.0, 0.0, 1.0), exp(-mag / 2) * val);
             }
 
             vec4 ad_col1(vec3 intersect, float mag) {
