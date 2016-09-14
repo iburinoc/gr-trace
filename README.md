@@ -1,1 +1,1 @@
-[Screenshot taken from program](resources/bh_gen.png)
+![Screenshot taken from program](https://raw.githubusercontent.com/iburinoc/gr_trace/master/resources/bh_gen.png)
