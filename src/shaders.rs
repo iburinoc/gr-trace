@@ -411,14 +411,27 @@ vec4 bg_col(vec3 dir) {
     mod bh {
         use clap::ArgMatches;
         pub fn check(args: &ArgMatches) -> String {
-            BH_CHECK.to_string()
-        }
-
-        const BH_CHECK: &'static str = r#"
-            {
+            format!(r#"
+            {{
             float mindist2;
             float t;
             vec3 closest;
+
+            {get_closest}
+
+            if(dot(closest, closest) <= R_s * R_s) {{
+                vec4 colour;
+                {colour}
+                ccolor += colour * alpha_rem * 1.0;
+                alpha_rem -= alpha_rem * 1.0;
+            }}
+            }}
+            "#,
+                get_closest = GET_CLOSEST,
+                colour = get_colour(args))
+        }
+
+        const GET_CLOSEST: &'static str = r#"
             {
                 vec3 c = cross(npos, pos);
                 vec3 d = pos - npos;
@@ -427,14 +440,27 @@ vec4 bg_col(vec3 dir) {
                 t = dot(pos, d) / dot(d, d);
                 t = clamp(t, 0.0, 1.0);
                 closest = pos + t * (npos - pos);
-
-            }
-            if(dot(closest, closest) <= R_s * R_s) {
-                ccolor += vec4(0.0, 0.0, 0.0, 1.0) * alpha_rem * 1.0;
-                alpha_rem -= alpha_rem * 1.0;
-            }
             }
         "#;
+
+        fn get_colour(args: &ArgMatches) -> &'static str {
+            match args.value_of("surface").unwrap() {
+                "black" => "colour = vec4(0.0, 0.0, 0.0, 1.0);",
+                "checkered" => r#"
+                    const float PI = 3.1415926535897932384626433832795;
+                    float yaw = atan2(closest.y, closest.x);
+                    float pitch = atan(sqrt(
+                        closest.x * closest.x +
+                        closest.y * closest.y) / closest.z);
+                    int b0 = int(yaw * 180 / PI / 15);
+                    int b1 = int(pitch * 180 / PI / 15);
+                    int red = (b0 + b1) % 2;
+                    colour = vec4(red, 0.0, 0.0, 1.0);
+                "#
+                ,
+                _ => panic!("Invalid blackhole surface")
+            }
+        }
     }
 
     mod ad {

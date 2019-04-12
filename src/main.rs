@@ -118,8 +118,8 @@ impl Camera {
                 VirtualKeyCode::Q => depth -= 1.0,
                 VirtualKeyCode::E => depth += 1.0,
                 VirtualKeyCode::LShift => dist = 2f32,
-                VirtualKeyCode::I => pitch = pitch + ang,
-                VirtualKeyCode::K => pitch = pitch - ang,
+                VirtualKeyCode::I => pitch = pitch - ang,
+                VirtualKeyCode::K => pitch = pitch + ang,
                 VirtualKeyCode::J => yaw = yaw - ang,
                 VirtualKeyCode::L => yaw = yaw + ang,
                 VirtualKeyCode::U => roll = roll + ang,
@@ -232,6 +232,17 @@ fn arg_handle<'a>() -> ArgMatches<'a> {
                 .takes_value(true)
                 .value_name("RADIUS")
                 .default_value("15"),
+        )
+        .arg(
+            Arg::with_name("surface")
+                .short("s")
+                .long("surface")
+                .help("Sets the type of black hole surface used")
+                .takes_value(true)
+                .value_name("SURFACE")
+                .default_value("black")
+                .possible_value("black")
+                .possible_value("checkered"),
         )
         .arg(
             Arg::with_name("fov")
