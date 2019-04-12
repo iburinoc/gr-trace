@@ -10,8 +10,10 @@ pub struct Shader {
 
 impl Shader {
     pub fn construct(args: &ArgMatches) -> Self {
-        Shader { vert_shader: Shader::construct_vert_shader(args),
-                 frag_shader: Shader::construct_frag_shader(args) }
+        Shader {
+            vert_shader: Shader::construct_vert_shader(args),
+            frag_shader: Shader::construct_frag_shader(args),
+        }
     }
 
     #[allow(unused_variables)]
@@ -24,16 +26,15 @@ impl Shader {
     }
 
     pub fn compile<F>(self, display: &F) -> glium::Program
-                  where F: glium::backend::Facade {
-        let res = glium::Program::from_source(display,
-                &self.vert_shader,
-                &self.frag_shader,
-                None);
+    where
+        F: glium::backend::Facade,
+    {
+        let res = glium::Program::from_source(display, &self.vert_shader, &self.frag_shader, None);
         match res {
             Ok(t) => t,
             Err(e) => {
                 panic!("{}", e);
-            },
+            }
         }
     }
 }
@@ -66,7 +67,8 @@ void main() {
 mod vert_shader {
     use clap::ArgMatches;
     pub fn gen_shader(args: &ArgMatches) -> String {
-        format!(r#"
+        format!(
+            r#"
             {preamble}
 
             {params}
@@ -75,7 +77,8 @@ mod vert_shader {
         "#,
             preamble = PREAMBLE,
             params = params(args),
-            main = MAIN)
+            main = MAIN
+        )
     }
 
     const PREAMBLE: &'static str = r#"
@@ -104,10 +107,12 @@ mod vert_shader {
         use std::f32;
         let fov: f32 = args.value_of("fov").unwrap().parse().unwrap();
         let rat = (fov / 2.0f32 / 180.0f32 * f32::consts::PI).tan();
-        format!(r#"
+        format!(
+            r#"
             const float fov_ratio = {};
         "#,
-            rat)
+            rat
+        )
     }
 }
 
@@ -115,7 +120,8 @@ mod vert_shader {
 mod frag_shader {
     use clap::ArgMatches;
     pub fn gen_shader(args: &ArgMatches) -> String {
-        format!(r#"
+        format!(
+            r#"
 {preamble}
 
 {bg_func}
@@ -155,17 +161,17 @@ void main() {{
 }}
 
     "#,
-        
-        preamble = PREAMBLE,
-        bg_func = bg::func(args),
-        trace_params = trace::params(args),
-        ad_params = ad::params(args),
-        loop_vars = iter::vars(args),
-        trace_vars = trace::vars(args),
-        loop_cond = iter::cond(args),
-        update_func = trace::update(args),
-        bh_check = bh::check(args),
-        ad_check = ad::check(args))
+            preamble = PREAMBLE,
+            bg_func = bg::func(args),
+            trace_params = trace::params(args),
+            ad_params = ad::params(args),
+            loop_vars = iter::vars(args),
+            trace_vars = trace::vars(args),
+            loop_cond = iter::cond(args),
+            update_func = trace::update(args),
+            bh_check = bh::check(args),
+            ad_check = ad::check(args)
+        )
     }
 
     const PREAMBLE: &'static str = r#"
@@ -222,21 +228,24 @@ float ts_func(float ts, vec3 pos) {
         pub fn func(args: &ArgMatches) -> String {
             let s = args.value_of("bg").unwrap_or("img");
             let rat: f32 = args.value_of("bgrat").unwrap().parse().unwrap();
-            format!(r#"
+            format!(
+                r#"
                 const float BG_RAT = {rat};
 
                 {func}
             "#,
-            rat = rat,
-            func = BGS[(match s {
-                "img" => Type::Texture,
-                "black" => Type::Black,
-                _ => panic!("Invalid bg type"),
-            }) as usize].to_string())
+                rat = rat,
+                func = BGS[(match s {
+                    "img" => Type::Texture,
+                    "black" => Type::Black,
+                    _ => panic!("Invalid bg type"),
+                }) as usize]
+                    .to_string()
+            )
         }
 
         const BGS: [&'static str; 2] = [
-        r#"
+            r#"
 vec4 bg_col(vec3 dir) {
     return vec4(0.0, 0.0, 0.0, 1.0);
 }"#,
@@ -279,13 +288,14 @@ vec4 bg_col(vec3 dir) {
         pub fn cond(args: &ArgMatches) -> String {
             r#"float border = max(15.0 * 15.0, dot(src, src));
             while(dot(pos, pos) <= border &&
-                alpha_rem >= 0.01)"#.to_string()
+                alpha_rem >= 0.01)"#
+                .to_string()
         }
     }
 
     mod trace {
         use clap::ArgMatches;
-        
+
         enum Type {
             Flat = 0,
             Verlet = 1,
@@ -454,11 +464,14 @@ vec4 bg_col(vec3 dir) {
             let or: f32 = args.value_of("oradius").unwrap().parse().unwrap();
             let ir: f32 = args.value_of("iradius").unwrap().parse().unwrap();
             let extra = PARAMS[get_type(args) as usize].to_string();
-            format!(r#"
+            format!(
+                r#"
                 const float DISK_O_RAD = {};
                 const float DISK_I_RAD = {};
                 {}
-                "#, or, ir, extra)
+                "#,
+                or, ir, extra
+            )
         }
 
         const CHECK: &'static str = r#"
@@ -586,4 +599,3 @@ vec4 bg_col(vec3 dir) {
         ];
     }
 }
-

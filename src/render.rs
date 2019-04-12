@@ -1,17 +1,17 @@
-extern crate glium;
-extern crate clap; 
-extern crate image;
 extern crate cgmath;
+extern crate clap;
+extern crate glium;
+extern crate image;
 extern crate time;
 
-use glium::backend::Facade;
-use glium::{Surface, Frame};
 use clap::ArgMatches;
+use glium::backend::Facade;
+use glium::{Frame, Surface};
 use std::f32;
 
 use shaders::Shader;
 
-use ::Camera;
+use Camera;
 
 struct RenderParams {
     iter: i32,
@@ -31,7 +31,9 @@ pub struct Renderer {
 
 impl Renderer {
     pub fn new<F>(display: &F, args: &ArgMatches) -> Self
-                  where F: Facade {
+    where
+        F: Facade,
+    {
         let bg = {
             use std::io::Cursor;
             //FIXME: insert alternate bg images here
@@ -41,12 +43,12 @@ impl Renderer {
             } else {
                 &include_bytes!("../resources/bg.jpg")[..]
             };
-            let im = image::load(Cursor::new(bytes),
-                                 image::JPEG).unwrap().to_rgba();
+            let im = image::load(Cursor::new(bytes), image::JPEG)
+                .unwrap()
+                .to_rgba();
 
             let imdim = im.dimensions();
-            let im = glium::texture::RawImage2d::from_raw_rgba_reversed(
-                        im.into_raw(), imdim);
+            let im = glium::texture::RawImage2d::from_raw_rgba_reversed(im.into_raw().as_slice(), imdim);
             glium::texture::SrgbTexture2d::new(display, im).unwrap()
         };
 
@@ -54,12 +56,12 @@ impl Renderer {
             use std::io::Cursor;
 
             let bytes = &include_bytes!("../resources/ad.png")[..];
-            let im = image::load(Cursor::new(bytes),
-                                 image::PNG).unwrap().to_rgba();
+            let im = image::load(Cursor::new(bytes), image::PNG)
+                .unwrap()
+                .to_rgba();
 
             let imdim = im.dimensions();
-            let im = glium::texture::RawImage2d::from_raw_rgba_reversed(
-                        im.into_raw(), imdim);
+            let im = glium::texture::RawImage2d::from_raw_rgba_reversed(im.into_raw().as_slice(), imdim);
             glium::texture::SrgbTexture2d::new(display, im).unwrap()
         };
 
@@ -67,16 +69,22 @@ impl Renderer {
 
         let bufs = {
             use glium::index::PrimitiveType::TrianglesList;
-            RenderBuffers(glium::VertexBuffer::new(display, &VERTICES).unwrap(),
-             glium::IndexBuffer::new(display, TrianglesList, &INDICES).unwrap())
+            RenderBuffers(
+                glium::VertexBuffer::new(display, &VERTICES).unwrap(),
+                glium::IndexBuffer::new(display, TrianglesList, &INDICES).unwrap(),
+            )
         };
 
-        Renderer { program: prog, background: bg, disk: ad,
-            buffers: bufs, params: RenderParams::new(args) }
+        Renderer {
+            program: prog,
+            background: bg,
+            disk: ad,
+            buffers: bufs,
+            params: RenderParams::new(args),
+        }
     }
 
     pub fn render(&self, mut target: Frame, camera: &Camera, time: f32) {
-
         target.clear_color(0., 0., 0., 0.0);
 
         let (width, height) = target.get_dimensions();
@@ -84,8 +92,8 @@ impl Renderer {
         let (src, facing_mat) = {
             use cgmath::Matrix;
 
-            let src = Into::<[f32;3]>::into(camera.pos);
-            let facing_mat = Into::<[[f32;3];3]>::into(camera.facing.transpose());
+            let src = Into::<[f32; 3]>::into(camera.pos);
+            let facing_mat = Into::<[[f32; 3]; 3]>::into(camera.facing.transpose());
 
             (src, facing_mat)
         };
@@ -112,11 +120,18 @@ impl Renderer {
                 alpha: glium::BlendingFunction::AlwaysReplace,
                 constant_value: (0.0, 0.0, 0.0, 0.0),
             },
-            .. Default::default()
+            ..Default::default()
         };
 
-        target.draw(&self.buffers.0, &self.buffers.1, &self.program,
-                    &uniforms, &params).unwrap();
+        target
+            .draw(
+                &self.buffers.0,
+                &self.buffers.1,
+                &self.program,
+                &uniforms,
+                &params,
+            )
+            .unwrap();
 
         target.finish().unwrap();
     }
@@ -140,13 +155,9 @@ implement_vertex!(RayVertex, pos);
 
 const VERTICES: [RayVertex; 4] = [
     RayVertex { pos: (-1., -1.) },
-    RayVertex { pos: (-1.,  1.) },
-    RayVertex { pos: ( 1.,  1.) },
-    RayVertex { pos: ( 1., -1.) },
+    RayVertex { pos: (-1., 1.) },
+    RayVertex { pos: (1., 1.) },
+    RayVertex { pos: (1., -1.) },
 ];
 
-const INDICES: [u8; 6] = [
-    0, 1, 2,
-    0, 2, 3
-];
-
+const INDICES: [u8; 6] = [0, 1, 2, 0, 2, 3];
